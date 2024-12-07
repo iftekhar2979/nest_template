@@ -2,13 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { ValidationExceptionFilter } from './common/filters/validationError';
-import { HttpExceptionFilter } from './common/filters/ExceptionFilter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptors';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptors';
 import { MongoDuplicateKeyExceptionFilter } from './common/filters/duplicateFilter';
-import { AllExceptionsFilter } from './common/filters/allValidationException';
-import { JwtAuthGuard } from './auth/guard/jwt-auth.guard';
-import { JwtService } from '@nestjs/jwt';
+import { UnauthorizedExceptionFilter } from './common/filters/unAuthorizedExectionError';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -27,6 +24,7 @@ async function bootstrap() {
 
   app.useGlobalFilters(new MongoDuplicateKeyExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter());
+  app.useGlobalFilters(new UnauthorizedExceptionFilter());
   // app.useGlobalFilters(new HttpExceptionFilter());
   // app.useGlobalGuards(new JwtAuthGuard());
   app.useGlobalInterceptors(new ResponseInterceptor());

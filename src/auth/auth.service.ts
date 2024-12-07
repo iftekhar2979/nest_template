@@ -1,7 +1,7 @@
 // import { EmailService } from './../common/mailer/sendMail';
 import { JwtService } from '@nestjs/jwt';
 import { authDto } from './dto/auth.dto';
-import { BadRequestException, HttpStatus, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Injectable, Request, UseGuards } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { comparePassword } from 'src/common/bycrypt/bycrypt';
@@ -12,6 +12,7 @@ import { CreateUserDto } from 'src/users/dto/createUser.dto';
 import { generateOtp } from 'src/common/utils/generateOtp';
 import { Otp } from './otp.schema';
 import { EmailService } from 'src/emailservice/emailservice.service';
+import { JwtAuthGuard } from './guard/jwt-auth.guard';
 
 @Injectable()
 export class AuthService {
@@ -69,7 +70,5 @@ export class AuthService {
     user.password = undefined;
     return { message: 'Logged In Successfully', data: user, token };
   }
-  async verifyOtp(otp){
-    
-  }
+ 
 }

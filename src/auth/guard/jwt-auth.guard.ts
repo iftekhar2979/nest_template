@@ -24,7 +24,7 @@ export class JwtAuthGuard implements CanActivate {
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException('Authorization token not found');
+      throw new UnauthorizedException('You are not autorizated to go!!!');
     }
 
     try {
@@ -32,7 +32,7 @@ export class JwtAuthGuard implements CanActivate {
       request.user = payload; // Attach user data to req.user
       return true;
     } catch (error) {
-        throw new UnauthorizedException('Authorization token not found');
+        throw new UnauthorizedException('You are not autorizated to go!!!');
     }
   }
 
