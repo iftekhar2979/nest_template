@@ -1,7 +1,9 @@
+import { resetPasswordDto, forgetPasswordDto } from './dto/auth.dto';
 // import { EmailService } from './../common/mailer/sendMail';
 import { JwtService } from '@nestjs/jwt';
 import { authDto } from './dto/auth.dto';
 import {
+  BadGatewayException,
   BadRequestException,
   HttpStatus,
   Injectable,
@@ -11,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { comparePassword } from 'src/common/bycrypt/bycrypt';
+import {  comparePassword, hashPassword } from 'src/common/bycrypt/bycrypt';
 import { User } from 'src/users/users.schema';
 import { profile, error } from 'console';
 import { IUser } from 'src/users/users.interface';
@@ -73,30 +75,44 @@ export class AuthService {
       role: user.role,
       profileID: user.profileID,
       name: user.name,
-    }; // The payload typically contains the user's data
+    };
     const token = this.jwtService.sign(payload); // Sign the JWT
     user.password = undefined;
     return { message: 'Logged In Successfully', data: user, token };
   }
-  async verifyOtp(user, code) {
-    let otpValue  = await this.otpModel.findOne({ userID: user.id });
+  async verifyOtp(user: Omit<IUser, 'password'>, code: string) {
+    let otpValue = await this.otpModel.findOne({ userID: user.id });
     if (otpValue.attempts > 2) {
       throw new BadRequestException("You're Otp has been expired !");
     }
-    if (otpValue.oneTimePassword!==code) {
+    if (otpValue.oneTimePassword !== code) {
       otpValue.attempts++;
       await otpValue.save();
       throw new NotFoundException('OTP not found!');
     }
-  
-    await this.userModel.findByIdAndUpdate(user.id, { isEmailVerified: true });
+    const updatedUser = await this.userModel.findByIdAndUpdate(user.id, {
+      isEmailVerified: true,
+    });
     await this.otpModel.deleteOne({ userID: user.id, code: code });
-    return { message: 'OTP Verified Successfully', data: {} };
+    let payload = {};
+    if (updatedUser.isEmailVerified) {
+      payload = {
+        id: user.id,
+        role: user.role,
+        tokenFor: 'email-verification',
+      };
+    }
+    payload = {
+      id: user.id,
+      role: user.role,
+      tokenFor: 'forget-password',
+    };
+    const token = this.jwtService.sign(payload);
+    return { message: 'OTP Verified Successfully', data: {}, token };
   }
-  async resendOtp(user) {
+  async resendOtp(user: Omit<IUser, 'password'>) {
     // Retrieve the last OTP entry for the user
     let otpData: otp = await this.otpModel.findOne({ userID: user.id });
-
     // If OTP data exists, check the time difference
     if (otpData && otpData.updatedAt) {
       const timeDifference = Date.now() - otpData.updatedAt.getTime();
@@ -110,23 +126,51 @@ export class AuthService {
     await this.otpModel.deleteOne({ userID: user.id });
     // Generate a new OTP
     let otp = generateOtp();
-    // Set expiration time for the OTP (3 minutes from now)
     const currentDate = new Date();
     currentDate.setMinutes(currentDate.getMinutes() + 3);
-
     // Create a new OTP document
     const saveOtp = new this.otpModel({
       oneTimePassword: otp,
-      userID: user._id,
+      userID: user.id,
       expiredAt: currentDate,
     });
-
     // Send OTP to the user's email
     await this.emailService.sendOtpEmail(user.email, otp, user.name);
-
     // Save the new OTP in the database
     await saveOtp.save();
 
     return { message: 'OTP sent successfully', data: {} };
+  }
+  async resetPassword(user: Partial<IUser>, resetPasswordDto) {
+    let id = user.id;
+    let userInfo = await this.userModel.findById(id).select('password');
+    if (!userInfo) {
+      throw new NotFoundException('User not Found!');
+    }
+    let isMatch = await comparePassword(
+      resetPasswordDto.oldPassword,
+      userInfo.password,
+    );
+    if (!isMatch) {
+      throw new BadRequestException('Password Not Matched!');
+    }
+    userInfo.password = resetPasswordDto.newPassword;
+    await userInfo.save();
+    return { message: 'Password Updated Successfully', data: {} };
+  }
+  async forgetPassword(payload, forgetPasswordDto) {
+    if (payload.tokenFor === 'email-verification') {
+      throw new BadGatewayException('Verification was for email verification!');
+    }
+    if (forgetPasswordDto.password !== forgetPasswordDto.confirmPassword) {
+      throw new BadRequestException(
+        'Password and Confirm Password not matched!!',
+      );
+    }
+    let user = await this.userModel.findOne({ _id: payload.id });
+    // const hashedPassword = await hashPassword(forgetPasswordDto.password)
+    user.password =forgetPasswordDto.password;
+    await user.save();
+    return { message: 'Password Updated Successfully', data: {} };
   }
 }
