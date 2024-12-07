@@ -6,9 +6,11 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptors
 import { LoggingInterceptor } from './common/interceptors/logging.interceptors';
 import { MongoDuplicateKeyExceptionFilter } from './common/filters/duplicateFilter';
 import { UnauthorizedExceptionFilter } from './common/filters/unAuthorizedExectionError';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   // Configure global validation (for DTOs, for example)
   // app.useGlobalPipes(new ValidationPipe());
 
@@ -25,7 +27,8 @@ async function bootstrap() {
   app.useGlobalFilters(new MongoDuplicateKeyExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter());
   app.useGlobalFilters(new UnauthorizedExceptionFilter());
-  // app.useGlobalFilters(new HttpExceptionFilter());
+   // Serve static files from the public folder
+   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/uploads' });
   // app.useGlobalGuards(new JwtAuthGuard());
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
