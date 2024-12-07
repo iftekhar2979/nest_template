@@ -9,5 +9,7 @@ export class Otp extends Document {
   oneTimePassword: string;
   @Prop({ required: true })
   expiredAt: Date;
+  @Prop({default:0})
+  attempts:number
 }
 export const OtpSchema = SchemaFactory.createForClass(Otp);

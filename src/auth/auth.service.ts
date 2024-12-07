@@ -1,7 +1,14 @@
 // import { EmailService } from './../common/mailer/sendMail';
 import { JwtService } from '@nestjs/jwt';
 import { authDto } from './dto/auth.dto';
-import { BadRequestException, HttpStatus, Injectable, Request, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { comparePassword } from 'src/common/bycrypt/bycrypt';
@@ -13,6 +20,7 @@ import { generateOtp } from 'src/common/utils/generateOtp';
 import { Otp } from './otp.schema';
 import { EmailService } from 'src/emailservice/emailservice.service';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
+import { otp } from './interface/otp.inteface';
 
 @Injectable()
 export class AuthService {
@@ -70,5 +78,55 @@ export class AuthService {
     user.password = undefined;
     return { message: 'Logged In Successfully', data: user, token };
   }
- 
+  async verifyOtp(user, code) {
+    let otpValue  = await this.otpModel.findOne({ userID: user.id });
+    if (otpValue.attempts > 2) {
+      throw new BadRequestException("You're Otp has been expired !");
+    }
+    if (otpValue.oneTimePassword!==code) {
+      otpValue.attempts++;
+      await otpValue.save();
+      throw new NotFoundException('OTP not found!');
+    }
+  
+    await this.userModel.findByIdAndUpdate(user.id, { isEmailVerified: true });
+    await this.otpModel.deleteOne({ userID: user.id, code: code });
+    return { message: 'OTP Verified Successfully', data: {} };
+  }
+  async resendOtp(user) {
+    // Retrieve the last OTP entry for the user
+    let otpData: otp = await this.otpModel.findOne({ userID: user.id });
+
+    // If OTP data exists, check the time difference
+    if (otpData && otpData.updatedAt) {
+      const timeDifference = Date.now() - otpData.updatedAt.getTime();
+      // Check if the last OTP was sent less than 30 seconds ago
+      if (timeDifference < 30000) {
+        throw new BadRequestException(
+          'You can resend the OTP only after 30 seconds.',
+        );
+      }
+    }
+    await this.otpModel.deleteOne({ userID: user.id });
+    // Generate a new OTP
+    let otp = generateOtp();
+    // Set expiration time for the OTP (3 minutes from now)
+    const currentDate = new Date();
+    currentDate.setMinutes(currentDate.getMinutes() + 3);
+
+    // Create a new OTP document
+    const saveOtp = new this.otpModel({
+      oneTimePassword: otp,
+      userID: user._id,
+      expiredAt: currentDate,
+    });
+
+    // Send OTP to the user's email
+    await this.emailService.sendOtpEmail(user.email, otp, user.name);
+
+    // Save the new OTP in the database
+    await saveOtp.save();
+
+    return { message: 'OTP sent successfully', data: {} };
+  }
 }

@@ -1,4 +1,4 @@
-import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UserService } from 'src/users/users.service';
 
@@ -23,6 +23,9 @@ export class JwtAuthGuard {
 
       if (payload.id !== user._id.toString()) {
         throw new UnauthorizedException('You are not authorized to access this resource!');
+      }
+      if(user.isDeleted){
+        throw new BadRequestException("User is Not Available!")
       }
 
       request.user = payload; // Attach user data to the request

@@ -20,12 +20,15 @@ export class AuthController {
   }
   @Post('verify-otp')
   @UseGuards(JwtAuthGuard)
-  // @Roles("admin")
-  getProfile(@Request() req) {
+  VerifyOtp(@Request() req,@Body() body:{code:number}) {
     const user = req.user; // Access user data from JWT
-    return {
-      message: `Welcome, ${user.name}!`,
-      user,
-    };
+   const code=body.code
+    return this.authService.verifyOtp(user,code)
+  }
+  @Post('resend-otp')
+  @UseGuards(JwtAuthGuard)
+  resendOtp(@Request() req) {
+    const user = req.user; // Access user data from JWT
+    return this.authService.resendOtp(user)
   }
 }

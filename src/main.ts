@@ -11,9 +11,6 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  // Configure global validation (for DTOs, for example)
-  // app.useGlobalPipes(new ValidationPipe());
-
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true, // Automatically transform plain objects into DTOs
@@ -21,15 +18,10 @@ async function bootstrap() {
       forbidNonWhitelisted: true, // Throws error if unknown properties are passed
     }),
   );
-  // Apply global exception filter
-  // app.useGlobalFilters(new AllExceptionsFilter());
-
   app.useGlobalFilters(new MongoDuplicateKeyExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter());
   app.useGlobalFilters(new UnauthorizedExceptionFilter());
-   // Serve static files from the public folder
-   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/uploads' });
-  // app.useGlobalGuards(new JwtAuthGuard());
+  app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/uploads' });
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
   await app.listen(process.env.PORT ?? 3000);
