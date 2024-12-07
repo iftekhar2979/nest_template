@@ -10,6 +10,7 @@ import { UserService } from 'src/users/users.service';
 import { Otp, OtpSchema } from './otp.schema';
 // import { EmailService } from 'src/common/mailer/sendMail';
 import { EmailserviceModule } from 'src/emailservice/emailservice.module';
+import { Reflector } from '@nestjs/core';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { EmailserviceModule } from 'src/emailservice/emailservice.module';
       signOptions: { expiresIn: '1h' }, // Token expiration time
     }),
     UsersModule,
-    EmailserviceModule
+    EmailserviceModule,
+    Reflector,  // Register Reflector for metadata reflection
   ],
   providers: [AuthService],
   controllers: [AuthController],

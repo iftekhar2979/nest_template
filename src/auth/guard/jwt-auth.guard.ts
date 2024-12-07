@@ -1,44 +1,39 @@
-import { AuthService } from './../auth.service';
-// import { Injectable } from '@nestjs/common';
+import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { Reflector } from '@nestjs/core';
-import * as passport from 'passport';
-// import { AuthService } from '../auth/auth.service';
-import { Request } from 'express';
+import { UserService } from 'src/users/users.service';
 
 @Injectable()
-export class JwtAuthGuard implements CanActivate {
+export class JwtAuthGuard {
   constructor(
-    private readonly jwtService: JwtService,
+    private readonly jwtService: JwtService, // Inject JwtService
+    private readonly userService: UserService, // Inject UserService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request: Request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException('You are not autorizated to go!!!');
+      throw new UnauthorizedException('You are not authorized to access this resource!');
     }
 
     try {
       const payload = await this.jwtService.verifyAsync(token);
-      request.user = payload; // Attach user data to req.user
+      const user = await this.userService.findOne(payload.id);
+
+      if (payload.id !== user._id.toString()) {
+        throw new UnauthorizedException('You are not authorized to access this resource!');
+      }
+
+      request.user = payload; // Attach user data to the request
       return true;
     } catch (error) {
-        throw new UnauthorizedException('You are not autorizated to go!!!');
+      throw new UnauthorizedException('You are not authorized to access this resource!');
     }
   }
 
-  // Helper method to extract token from Authorization header
-  private extractTokenFromHeader(request: Request): string | null {
-    const bearerToken = request.headers['authorization']; // e.g., "Bearer <token>"
+  private extractTokenFromHeader(request: any): string | null {
+    const bearerToken = request.headers['authorization'];
     if (bearerToken && bearerToken.startsWith('Bearer ')) {
       return bearerToken.split(' ')[1];
     }

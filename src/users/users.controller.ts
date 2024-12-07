@@ -13,11 +13,15 @@ import {
   BadRequestException,
   ConflictException,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { IUser } from './users.interface';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import { CreateUserDto } from './dto/createUser.dto';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { Roles } from 'src/common/custom-decorator/role.decorator';
+import { RolesGuard } from 'src/auth/guard/role-gurad';
 
 @Controller('users')
 export class UserController {
@@ -27,7 +31,9 @@ export class UserController {
     return this.userService.create(createUserDto);
   }
   @Get()
-  async findAll(@Query() query:{limit:number,page:number}) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  async findAll(@Query() query: { limit: number; page: number }) {
     try {
       return this.userService.findAll(query);
     } catch (error) {
