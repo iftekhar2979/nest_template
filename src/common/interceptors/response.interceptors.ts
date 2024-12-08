@@ -20,13 +20,13 @@ export class ResponseInterceptor implements NestInterceptor {
           // If the response is an array (e.g., a list of users or products)
           message = `Found ${data?.data.length} items`;
         }
-        if (data && data.name) {
-          // If the data contains a 'name' property (e.g., User model)
-          message = `User ${data.name} has been retrieved`;
-        } else if (data && data.productName) {
-          // If the data contains a 'productName' property (e.g., Product model)
-          message = `Product ${data.productName} has been retrieved`;
-        }
+        // if (data && data.name) {
+        //   // If the data contains a 'name' property (e.g., User model)
+        //   message = `User has been retrieved`;
+        // } else if (data && data.productName) {
+        //   // If the data contains a 'productName' property (e.g., Product model)
+        //   message = `Product ${data.productName} has been retrieved`;
+        // }
         if(data?.token){
           return {
             status: 'success',
@@ -52,7 +52,7 @@ export class ResponseInterceptor implements NestInterceptor {
           statusCode: 200,
           message: data?.message ? data?.message : message,
           data: data?.pagination || data.data ? data?.data : data || {}, // Provide a default empty object if no data exists
-          pagination: data?.pagination ? data?.pagination : {},
+         
         };
       }),
     );
