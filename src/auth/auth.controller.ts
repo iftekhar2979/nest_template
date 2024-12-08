@@ -13,7 +13,6 @@ import { AuthService } from './auth.service';
 import { authDto, forgetPasswordDto, resetPasswordDto } from './dto/auth.dto';
 import { CreateUserDto } from 'src/users/dto/createUser.dto';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
-import { Roles } from 'src/common/custom-decorator/role.decorator';
 
 @Controller('auth')
 export class AuthController {

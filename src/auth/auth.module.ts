@@ -11,13 +11,15 @@ import { Otp, OtpSchema } from './otp.schema';
 // import { EmailService } from 'src/common/mailer/sendMail';
 import { EmailserviceModule } from 'src/emailservice/emailservice.module';
 import { Reflector } from '@nestjs/core';
+import { Profile, ProfileSchema } from 'src/profile/profile.schema';
 
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     MongooseModule.forFeature([{ name: Otp.name, schema: OtpSchema }]),
-    // MongooseModule.forFeature([{name.Use}])
+    MongooseModule.forFeature([{ name: Profile.name, schema: ProfileSchema }]),
+
     JwtModule.register({
       secret: 'yourSecretKey', // You should move this to a config file or env variables
       signOptions: { expiresIn: '1h' }, // Token expiration time

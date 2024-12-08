@@ -1,3 +1,4 @@
+// import { IsDate } from 'class-validator';
 // src/user/dto/create-user.dto.ts
 import {
   IsString,
@@ -5,6 +6,9 @@ import {
   IsBoolean,
   IsOptional,
   IsEnum,
+  isString,
+  IsDate,
+  IsDateString,
 } from 'class-validator';
 import mongoose from 'mongoose';
 
@@ -43,4 +47,10 @@ export class CreateUserDto {
 
   @IsOptional()
   isDeleted: boolean;
+  @IsEnum(['male', 'female'], { message: 'Gender must be male of female' })
+  gender: string;
+  @IsString()
+  dOB: Date;
+  @IsString()
+  height: string;
 }

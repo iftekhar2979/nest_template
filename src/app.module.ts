@@ -10,6 +10,10 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptors
 import { ValidationExceptionFilter } from './common/filters/validationError';
 import { AuthModule } from './auth/auth.module';
 import { EmailserviceModule } from './emailservice/emailservice.module';
+import { ProfileModule } from './profile/profile.module';
+// import { LifestyleController } from './lifestyle/lifestyle.controller';
+// import { LifestyleService } from './lifestyle/lifestyle.service';
+import { LifestyleModule } from './lifestyle/lifestyle.module';
 
 @Module({
   imports:  [
@@ -18,6 +22,8 @@ import { EmailserviceModule } from './emailservice/emailservice.module';
     UsersModule,
     AuthModule,
     EmailserviceModule,
+    ProfileModule,
+    LifestyleModule,
   ],
   controllers: [AppController],
   providers: [
@@ -25,7 +31,8 @@ import { EmailserviceModule } from './emailservice/emailservice.module';
       provide: APP_FILTER,
       useClass: ValidationExceptionFilter,
     },
-    AppService,  // Add AppService to the providers array
+    AppService,
+  // Add AppService to the providers array
   ],
 })
 export class AppModule {}
