@@ -15,6 +15,7 @@ import { ProfileModule } from './profile/profile.module';
 // import { LifestyleService } from './lifestyle/lifestyle.service';
 import { LifestyleModule } from './lifestyle/lifestyle.module';
 import { JwtModule } from '@nestjs/jwt';
+import { GalleryModule } from './gallery/gallery.module';
 
 @Module({
   imports:  [
@@ -25,6 +26,7 @@ import { JwtModule } from '@nestjs/jwt';
     EmailserviceModule,
     ProfileModule,
     LifestyleModule,
+    GalleryModule,
   ],
   controllers: [AppController],
   providers: [

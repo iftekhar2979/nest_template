@@ -35,7 +35,6 @@ export class Profile extends Document {
   lifeStyle: [string];
   @Prop()
   address: string;
-
   @Prop({ type: Object })
   location: {
     type: 'Point';
