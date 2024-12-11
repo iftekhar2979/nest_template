@@ -6,28 +6,26 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { ProfileDto } from './dto/profile.dto'; // Import the DTO
-import { IProfile } from './interface/profile.interface'; // Import the Profile interface
-
+import { InterestAndValuesAttributes, IProfile, userLifeStyle } from './interface/profile.interface'; // Import the Profile interface
+import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
+import { User } from 'src/auth/interface/jwt.info.interfact';
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectModel('Profile') private readonly profileModel: Model<IProfile>,
     private readonly lifeStyleService: LifestyleService,
   ) {}
-  async updateLifeStyle(user, LifeStyleDto, interestAndValues) {
-    // console.log(userID);
+  async updateLifeStyle(user:User, LifeStyleDto:userLifeStyle, interestAndValues:InterestAndValuesAttributes) {
     let userID = user.id;
     let profileID = user.profileID;
-
     let lifeStyle = Object.values(LifeStyleDto);
-
+    // console.log(interestAndValues)
     await this.profileModel.findByIdAndUpdate(profileID, {
       lifeStyle: lifeStyle,
       interest: interestAndValues.interest,
       values: interestAndValues.values,
     });
     LifeStyleDto.userID = userID;
-    // await this.li.create(LifeStyleDto);
     await this.lifeStyleService.createLifeStyle(LifeStyleDto);
 
     return { message: 'life style successfully updated!', data: {} };
@@ -51,7 +49,7 @@ export class ProfileService {
   // UPDATE: Update a profile by ID
   async updateProfile(
     profileId: string,
-    profileDto: ProfileDto,
+    profileDto: EditProfileBasicInfoDto,
   ): Promise<IProfile | null> {
     return this.profileModel
       .findByIdAndUpdate(profileId, profileDto, {

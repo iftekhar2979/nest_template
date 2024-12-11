@@ -6,7 +6,7 @@ import * as bcrypt from 'bcryptjs'; // Import bcryptjs
 // Define the User schema using the Schema decorator
 @Schema({ timestamps: true })
 export class LifeStyle extends Document {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique:true })
   userID: mongoose.Schema.Types.ObjectId;
   @Prop({ type: String, required: true, trim: true, lowercase: true })
   smoking: string;

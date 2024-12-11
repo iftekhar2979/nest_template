@@ -1,3 +1,4 @@
+import { interestAndValues } from './../dto/lifeStyleAndValues.dto';
 import { Document, Types } from 'mongoose';
 
 export interface IProfile extends Document {
@@ -25,4 +26,22 @@ export interface IProfile extends Document {
   isActive?: boolean;
   isSubscribed?: boolean;
   isBatchAvailable?: boolean;
+}
+
+export interface userLifeStyle {
+  userID?:Types.ObjectId |string
+  smoking: string;
+  drinking: string;
+  sleepSchedule: string;
+  pets: string;
+  execise: string;
+  education: string;
+  communicationStyle: string;
+  relationshipPreference: string;
+  socialMedia: string;
+}
+
+export interface InterestAndValuesAttributes {
+  values: string[];
+  interest: string[];
 }

@@ -4,12 +4,20 @@ import { LifeStyle, LifeStyleSchema } from './lifestyle.schema';
 import { LifestyleService } from './lifestyle.service';
 import { LifeStyleController } from './lifestyle.controller';
 import { ProfileModule } from 'src/profile/profile.module';
+import { JwtModule } from '@nestjs/jwt';
+import { UserService } from 'src/users/users.service';
+import { UsersModule } from 'src/users/users.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: LifeStyle.name, schema: LifeStyleSchema },
     ]),
+    JwtModule.register({
+      secret: 'yourSecretKey', // You should move this to a config file or env variables
+      signOptions: { expiresIn: '1h' }, // Token expiration time
+    }),
+    UsersModule
   ],
   providers: [LifestyleService],
   controllers: [LifeStyleController],

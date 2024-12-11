@@ -6,7 +6,12 @@ import * as bcrypt from 'bcryptjs'; // Import bcryptjs
 // Define the User schema using the Schema decorator
 @Schema({ timestamps: true })
 export class Profile extends Document {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true,
+  })
   userID: mongoose.Schema.Types.ObjectId;
   @Prop()
   bio: string;
@@ -14,9 +19,9 @@ export class Profile extends Document {
   country: string;
   @Prop()
   profilePictureUrl: string;
-  @Prop()
-  languages: string;
-  @Prop()
+  @Prop({ type: Array })
+  languages: [string];
+  @Prop({ required: true })
   dOB: Date;
   @Prop()
   education: string;
@@ -30,6 +35,7 @@ export class Profile extends Document {
   lifeStyle: [string];
   @Prop()
   address: string;
+
   @Prop({ type: Object })
   location: {
     type: 'Point';

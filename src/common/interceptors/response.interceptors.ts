@@ -16,21 +16,15 @@ export class ResponseInterceptor implements NestInterceptor {
     return next.handle().pipe(
       map((data) => {
         let message = 'Request was successful';
-        if (Array.isArray(data?.data)) {
-          // If the response is an array (e.g., a list of users or products)
-          message = `Found ${data?.data.length} items`;
-        }
-        // if (data && data.name) {
-        //   // If the data contains a 'name' property (e.g., User model)
-        //   message = `User has been retrieved`;
-        // } else if (data && data.productName) {
-        //   // If the data contains a 'productName' property (e.g., Product model)
-        //   message = `Product ${data.productName} has been retrieved`;
+        // console.log(data)
+        // if (Array.isArray(data?.data)) {
+        //   // If the response is an array (e.g., a list of users or products)
+        //   message = `Found ${data?.data.length} items`;
         // }
         if(data?.token){
           return {
             status: 'success',
-            statusCode: 200,
+            statusCode:  data?.statusCode || 200 ,
             message: data?.message ? data?.message : message,
             data: data?.pagination || data.data ? data?.data : data || {}, // Provide a default empty object if no data exists
             // pagination: data?.pagination ? data?.pagination : {},
@@ -40,7 +34,7 @@ export class ResponseInterceptor implements NestInterceptor {
         if(data?.pagination){
           return {
             status: 'success',
-            statusCode: 200,
+            statusCode:  data?.statusCode || 200 ,
             message: data?.message ? data?.message : message,
             data: data?.pagination || data.data ? data?.data : data || {}, // Provide a default empty object if no data exists
             pagination: data?.pagination,
@@ -49,7 +43,7 @@ export class ResponseInterceptor implements NestInterceptor {
         // Check if data is undefined or null and handle appropriately
         return {
           status: 'success',
-          statusCode: 200,
+          statusCode: data?.statusCode || 200 ,
           message: data?.message ? data?.message : message,
           data: data?.pagination || data.data ? data?.data : data || {}, // Provide a default empty object if no data exists
          

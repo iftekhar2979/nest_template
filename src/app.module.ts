@@ -14,6 +14,7 @@ import { ProfileModule } from './profile/profile.module';
 // import { LifestyleController } from './lifestyle/lifestyle.controller';
 // import { LifestyleService } from './lifestyle/lifestyle.service';
 import { LifestyleModule } from './lifestyle/lifestyle.module';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports:  [

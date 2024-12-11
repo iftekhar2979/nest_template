@@ -12,9 +12,9 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     const validationErrors = exception.getResponse() as any;
     // console.log(exception)
     response.status(exception.getStatus()).json({
-      statusCode: exception.getStatus(),
-      message: validationErrors.message,
       path: request.url,
+      statusCode: exception.getStatus(),
+      message: "Validation Error!",
       error:validationErrors.message,
       status:"fail"
     });

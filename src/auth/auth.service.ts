@@ -38,7 +38,10 @@ export class AuthService {
 
   async create(createUserDto: CreateUserDto): Promise<any> {
     // Create the user
-    const newUser = new this.userModel(createUserDto);
+    if(createUserDto.password){
+      createUserDto.userCreatedMethod="custom"
+    }
+    const newUser = new this.userModel({...createUserDto});
     
     // Generate OTP
     let otp = generateOtp();

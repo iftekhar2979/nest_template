@@ -8,10 +8,12 @@ import {
   Delete,
   UseGuards,
   Request,
+  NotFoundException,
+  Patch,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { ProfileDto } from './dto/profile.dto';
-import { IProfile } from './interface/profile.interface';
+import { IProfile, userLifeStyle, InterestAndValuesAttributes } from './interface/profile.interface';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { LifeStyleDto, interestAndValues } from './dto/lifeStyleAndValues.dto';
@@ -21,6 +23,7 @@ import {
   omitProperties,
   pickProperties,
 } from 'src/common/utils/omitProperties';
+import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 
 @Controller('profiles')
 export class ProfileController {
@@ -33,6 +36,8 @@ export class ProfileController {
   }
   // READ: Find all profiles
   @Get()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async findAllProfiles(): Promise<IProfile[]> {
     return this.profileService.findAllProfiles();
   }
@@ -44,12 +49,11 @@ export class ProfileController {
     @Body() LifeStyleDto: LifeStyleDto,
   ): Promise<any> {
     let user = req.user;
-    let lifestyle = omitProperties(LifeStyleDto, ['interest', 'values']);
-    let interestAndValues = pickProperties(LifeStyleDto, [
+    let lifestyle = omitProperties(LifeStyleDto, ['interest', 'values']) as userLifeStyle;
+    let interestAndValues  = pickProperties(LifeStyleDto, [
       'values',
       'interest',
-    ]);
-
+    ]) as InterestAndValuesAttributes ;
     return this.profileService.updateLifeStyle(
       user,
       lifestyle,
@@ -59,17 +63,26 @@ export class ProfileController {
 
   // READ: Find a profile by ID
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
   async findProfileById(@Param('id') id: string): Promise<IProfile | null> {
     return this.profileService.findProfileById(id);
   }
 
   // UPDATE: Update a profile by ID
-  @Put(':id')
+  @Patch()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
   async updateProfile(
-    @Param('id') id: string,
-    @Body() profileDto: ProfileDto,
+    @Request() req,
+    @Body() editProfileBasicInfoDto:EditProfileBasicInfoDto,
   ): Promise<IProfile | null> {
-    return this.profileService.updateProfile(id, profileDto);
+    let id = req.user.profileID;
+    if(!id){
+      throw new NotFoundException("User Not Found!")
+    }
+
+    return this.profileService.updateProfile(id, editProfileBasicInfoDto);
   }
 
   // DELETE: Delete a profile by ID

@@ -53,4 +53,7 @@ export class CreateUserDto {
   dOB: Date;
   @IsString()
   height: string;
+  @IsOptional()
+  @IsEnum(['google', 'facebook', 'custom'])
+  userCreatedMethod: string;
 }

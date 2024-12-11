@@ -30,9 +30,9 @@ export class ProfileDto {
   profilePictureUrl?: string;
 
   @IsOptional()
-  @IsString()
-  languages?: string;
-
+  @IsArray()
+  languages?: [string];
+  
   @IsOptional()
   @IsDate()
   @Type(() => Date)
