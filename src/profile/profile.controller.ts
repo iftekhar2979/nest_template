@@ -24,6 +24,7 @@ import {
   pickProperties,
 } from 'src/common/utils/omitProperties';
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
+import { AddLocationDto } from './dto/edit.location.dto';
 
 @Controller('profiles')
 export class ProfileController {
@@ -81,8 +82,21 @@ export class ProfileController {
     if(!id){
       throw new NotFoundException("User Not Found!")
     }
-
     return this.profileService.updateProfile(id, editProfileBasicInfoDto);
+  }
+  @Patch('location')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
+  async updateLocation(
+    @Request() req,
+    @Body() AddLocationDto:AddLocationDto,
+  ): Promise<any> {
+    console.log("User dto",AddLocationDto)
+    let user = req.user;
+    if(!user.id){
+      throw new NotFoundException("User Not Found!")
+    }
+    return this.profileService.updateLocation(user,AddLocationDto);
   }
 
   // DELETE: Delete a profile by ID

@@ -27,7 +27,11 @@ export interface IProfile extends Document {
   isSubscribed?: boolean;
   isBatchAvailable?: boolean;
 }
-
+export interface Location{
+    type: 'Point';
+    coordinates: [number, number]; // Coordinates (longitude, latitude)
+ 
+}
 export interface userLifeStyle {
   userID?:Types.ObjectId |string
   smoking: string;

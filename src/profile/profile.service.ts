@@ -6,16 +6,26 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
 import { ProfileDto } from './dto/profile.dto'; // Import the DTO
-import { InterestAndValuesAttributes, IProfile, userLifeStyle } from './interface/profile.interface'; // Import the Profile interface
+import {
+  InterestAndValuesAttributes,
+  IProfile,
+  Location,
+  userLifeStyle,
+} from './interface/profile.interface'; // Import the Profile interface
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { User } from 'src/auth/interface/jwt.info.interfact';
+import { AddLocationDto } from './dto/edit.location.dto';
 @Injectable()
 export class ProfileService {
   constructor(
     @InjectModel('Profile') private readonly profileModel: Model<IProfile>,
     private readonly lifeStyleService: LifestyleService,
   ) {}
-  async updateLifeStyle(user:User, LifeStyleDto:userLifeStyle, interestAndValues:InterestAndValuesAttributes) {
+  async updateLifeStyle(
+    user: User,
+    LifeStyleDto: userLifeStyle,
+    interestAndValues: InterestAndValuesAttributes,
+  ) {
     let userID = user.id;
     let profileID = user.profileID;
     let lifeStyle = Object.values(LifeStyleDto);
@@ -56,6 +66,26 @@ export class ProfileService {
         new: true, // Return the updated document
       })
       .exec();
+  }
+
+  async updateLocation(
+    user: User,
+    AddLocationDto: AddLocationDto,
+  ): Promise<any> {
+    let location = {
+      type: 'Point',
+      coordinates: [parseFloat(AddLocationDto.longitude), parseFloat(AddLocationDto.latitude)],
+    };
+    console.log(location)
+    await this.profileModel.findByIdAndUpdate(
+      user.profileID,
+      { location },
+      { new: true },
+    )
+    return {
+      message: 'Location Updated Successfully',
+      data: {}
+    };
   }
 
   // DELETE: Delete a profile by ID

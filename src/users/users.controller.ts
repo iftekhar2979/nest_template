@@ -41,17 +41,22 @@ export class UserController {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
   }
-
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
   async findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
   async update(@Param('id') id: string, @Body() updateUserDto: any) {
     return this.userService.update(id, updateUserDto);
   }
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('user')
   async delete(@Param('id') id: string) {
     return this.userService.delete(id);
   }
