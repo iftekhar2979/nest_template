@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import * as bcrypt from 'bcryptjs'; // Import bcryptjs
+import { LifeStyle } from 'src/lifestyle/lifestyle.schema';
 
 // Define the User schema using the Schema decorator
 @Schema({ timestamps: true })
@@ -46,13 +47,6 @@ export class Profile extends Document {
   values: [string];
   @Prop({ type: Array })
   interest: [string];
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false,
-    default: null,
-  })
-  galleryID: mongoose.Schema.Types.ObjectId | null;
   @Prop({ default: false })
   isDeleted: boolean;
   @Prop({ default: false })
@@ -65,3 +59,4 @@ export class Profile extends Document {
 
 // Create the schema and apply pre-save hook outside the class
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
+ProfileSchema.index({insert:"text",values:"text",lifeStyle:"text",gender:"text"})

@@ -1,10 +1,8 @@
 import { LifestyleService } from './../lifestyle/lifestyle.service';
-import { interestAndValues } from './dto/lifeStyleAndValues.dto';
-import { LifeStyleDto } from './../lifestyle/dto/lifestyle.dto';
-// import { LifeStyle } from './utils-schema/lifeStyle.schema';
+import { ObjectId } from 'mongodb';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { ProfileDto } from './dto/profile.dto'; // Import the DTO
 import {
   InterestAndValuesAttributes,
@@ -37,7 +35,6 @@ export class ProfileService {
     });
     LifeStyleDto.userID = userID;
     await this.lifeStyleService.createLifeStyle(LifeStyleDto);
-
     return { message: 'life style successfully updated!', data: {} };
   }
   // CREATE: Create a new profile
@@ -52,8 +49,64 @@ export class ProfileService {
   }
 
   // READ: Find a profile by ID
-  async findProfileById(profileId: string): Promise<IProfile | null> {
-    return this.profileModel.findById(profileId).exec();
+  async findProfileById(profileId: string): Promise<any> {
+
+    let query=[
+      {
+        $match: {
+          _id: new ObjectId(profileId),
+        },
+      },
+      {
+        $lookup: {
+          from: 'galleries',
+          localField: '_id',
+          foreignField: 'profileID',
+          as: 'gallery',
+        },
+      },
+
+      {
+        $lookup: {
+          from: 'lifestyles',
+          localField: 'userID',
+          foreignField: 'userID',
+          as: 'lifestyle',
+        },
+      },
+
+      {
+        $addFields: {
+          lifestyle: {
+            $arrayElemAt: ['$lifestyle', 0], // Flatten lifestyle array
+          },
+        },
+      },
+      {
+        $addFields: {
+          age: {
+            $dateDiff: {
+              startDate: '$dOB', // Assuming dOB (Date of Birth) field exists
+              endDate: new Date(),
+              unit: 'year',
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          // Exclude fields directly here
+          lifeStyle: 0,
+          createdAt: 0,
+          updatedAt: 0,
+          isDeleted: 0,
+          __v: 0,
+          location: 0,
+        },
+      },
+    ]
+    let profile = await this.profileModel.aggregate(query);
+    return { message: 'User Retrived Successfully', data: profile[0] };
   }
 
   // UPDATE: Update a profile by ID
@@ -72,20 +125,72 @@ export class ProfileService {
     user: User,
     AddLocationDto: AddLocationDto,
   ): Promise<any> {
+    // Define the location object with latitude and longitude
     let location = {
       type: 'Point',
-      coordinates: [parseFloat(AddLocationDto.longitude), parseFloat(AddLocationDto.latitude)],
+      coordinates: [
+        parseFloat(AddLocationDto.longitude),
+        parseFloat(AddLocationDto.latitude),
+      ],
     };
-    console.log(location)
-    await this.profileModel.findByIdAndUpdate(
-      user.profileID,
-      { location },
-      { new: true },
-    )
-    return {
-      message: 'Location Updated Successfully',
-      data: {}
-    };
+
+    // Fetch location details from OpenCage API
+    try {
+      const response = await fetch(
+        `https://api.opencagedata.com/geocode/v1/json?q=${AddLocationDto.latitude},${AddLocationDto.longitude}&key=54411e052e544c04b65442b11b490ae6&language=en`,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch location data: ${response.statusText}`,
+        );
+      }
+
+      const data = await response.json();
+
+      // You can extract more specific location info here if needed
+      const locationDetails = data.results[0];
+
+      // Example: Extract formatted address and country
+      const formattedAddress = locationDetails.formatted;
+      const country = locationDetails.components.country;
+
+      // Optionally, update the location object with detailed address info
+      location = {
+        type: 'Point',
+        coordinates: [
+          parseFloat(AddLocationDto.longitude),
+          parseFloat(AddLocationDto.latitude),
+        ],
+      };
+      // Update the user's profile with the new location
+      await this.profileModel.findByIdAndUpdate(
+        user.profileID,
+        { location, country: country, address: formattedAddress },
+        { new: true },
+      );
+
+      return {
+        message: 'Location Updated Successfully',
+        data: {
+          address: formattedAddress,
+          country: country,
+        },
+      };
+    } catch (error) {
+      // Handle any errors during the API call or profile update
+      console.error('Error updating location:', error);
+      return {
+        message: 'Error updating location',
+        error: error.message,
+      };
+    }
+  }
+
+  async swipeProfiles(user: User): Promise<any> {
+    // let userProfile = await this.profileModel.findById(user.profileID)
+    let users = await this.profileModel.find({ isDeleted: false });
+    return { message: 'Swipe User Found', data: users };
   }
 
   // DELETE: Delete a profile by ID

@@ -10,6 +10,7 @@ import {
   Request,
   NotFoundException,
   Patch,
+  BadRequestException,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { ProfileDto } from './dto/profile.dto';
@@ -25,6 +26,7 @@ import {
 } from 'src/common/utils/omitProperties';
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { AddLocationDto } from './dto/edit.location.dto';
+import { Types } from 'mongoose';
 
 @Controller('profiles')
 export class ProfileController {
@@ -36,12 +38,12 @@ export class ProfileController {
     return this.profileService.createProfile(profileDto);
   }
   // READ: Find all profiles
-  @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  async findAllProfiles(): Promise<IProfile[]> {
-    return this.profileService.findAllProfiles();
-  }
+  // @Get()
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('admin')
+  // async findAllProfiles(): Promise<IProfile[]> {
+  //   return this.profileService.findAllProfiles();
+  // }
   @Put('lifestyle')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
@@ -66,7 +68,7 @@ export class ProfileController {
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
-  async findProfileById(@Param('id') id: string): Promise<IProfile | null> {
+  async findProfileById(@Param('id') id: string): Promise<any> {
     return this.profileService.findProfileById(id);
   }
 
@@ -84,6 +86,24 @@ export class ProfileController {
     }
     return this.profileService.updateProfile(id, editProfileBasicInfoDto);
   }
+
+  @Get()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('user')
+async getSwipesProfile(@Request() req): Promise<any> {
+  let user = req.user;
+  // Ensure user.id is present and is a valid ObjectId
+  if (!user.id) {
+    throw new NotFoundException("User Not Found!");
+  }
+  // Convert user.id to ObjectId if it's a valid string
+  const userId = Types.ObjectId.isValid(user.id) ? new Types.ObjectId(user.id) : null;
+  if (!userId) {
+    throw new BadRequestException("Invalid User ID format.");
+  }
+  return this.profileService.swipeProfiles(user);  // Pass userId to your service
+}
+
   @Patch('location')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
@@ -91,13 +111,14 @@ export class ProfileController {
     @Request() req,
     @Body() AddLocationDto:AddLocationDto,
   ): Promise<any> {
-    console.log("User dto",AddLocationDto)
+    // console.log("User dto",AddLocationDto)
     let user = req.user;
     if(!user.id){
       throw new NotFoundException("User Not Found!")
     }
     return this.profileService.updateLocation(user,AddLocationDto);
   }
+
 
   // DELETE: Delete a profile by ID
   @Delete(':id')
