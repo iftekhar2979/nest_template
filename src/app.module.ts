@@ -16,6 +16,8 @@ import { ProfileModule } from './profile/profile.module';
 import { LifestyleModule } from './lifestyle/lifestyle.module';
 import { JwtModule } from '@nestjs/jwt';
 import { GalleryModule } from './gallery/gallery.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 
 @Module({
   imports:  [
@@ -23,6 +25,9 @@ import { GalleryModule } from './gallery/gallery.module';
     MongooseModule.forRoot('mongodb://localhost:27017/vibely-db'),
     UsersModule,
     AuthModule,
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),  // Serve from the 'public' directory
+    }),
     EmailserviceModule,
     ProfileModule,
     LifestyleModule,

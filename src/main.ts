@@ -21,7 +21,7 @@ async function bootstrap() {
   app.useGlobalFilters(new MongoDuplicateKeyExceptionFilter());
   app.useGlobalFilters(new ValidationExceptionFilter());
   app.useGlobalFilters(new UnauthorizedExceptionFilter());
-  app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/uploads' });
+  app.useStaticAssets(join(__dirname, '..', 'public'));
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalInterceptors(new LoggingInterceptor());
   await app.listen(process.env.PORT ?? 3000);
