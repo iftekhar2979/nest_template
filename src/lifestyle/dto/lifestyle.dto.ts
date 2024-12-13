@@ -1,41 +1,62 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsOptional,
+  IsMongoId,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { ObjectId } from 'mongoose';
+import { ObjectId, Types } from 'mongoose';
+import {
+  CommunicationStyle,
+  DrinkingFrequency,
+  EducationLevel,
+  ExerciseEnum,
+  PetType,
+  RelationshipPreference,
+  SmokingStatus,
+  SocialMediaActivity,
+} from '../lifestyle.schema';
 
-export class LifeStyleDto {
+export class LifeStyleOnServiceDto {
   @IsNotEmpty()
   @IsString()
-  smoking: string; // No enum, just plain string validation
+  userID: string;
+  @IsNotEmpty()
+  @IsEnum(SmokingStatus, { message: 'Smoking must be Valid !' })
+  smoking: string;
 
   @IsNotEmpty()
-  @IsString()
-  drinking: string; // No enum, just plain string validation
+  @IsEnum(DrinkingFrequency, { message: 'Drinking on life style must be valid!' })
+  drinking: string;
 
   @IsNotEmpty()
-  @IsString()
-  sleepSchedule: string;
+  @IsEnum(PetType, { message: 'Pet on Life style must be valid!' })
+  pets: string;
 
   @IsNotEmpty()
-  @IsString()
-  pets: string; // No enum, just plain string validation
-
-  @IsNotEmpty()
-  @IsString()
+  @IsEnum(ExerciseEnum, { message: 'Exercise on Life style must be valid!' })
   execise: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(EducationLevel, { message: 'Education on Life style must be valid!' })
   education: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(CommunicationStyle, {
+    message: 'Communication style on Life style must be valid!',
+  })
   communicationStyle: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(RelationshipPreference, {
+    message: 'Relationship Preference on life style must be valid!',
+  })
   relationshipPreference: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(SocialMediaActivity, {
+    message: 'Social Media on life style must be valid!',
+  })
   socialMedia: string;
 }

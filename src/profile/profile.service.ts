@@ -13,6 +13,7 @@ import {
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { User } from 'src/auth/interface/jwt.info.interfact';
 import { AddLocationDto } from './dto/edit.location.dto';
+import { LifeStyleDto } from './dto/lifeStyleAndValues.dto';
 @Injectable()
 export class ProfileService {
   constructor(
@@ -21,27 +22,38 @@ export class ProfileService {
   ) {}
   async updateLifeStyle(
     user: User,
-    LifeStyleDto: userLifeStyle,
+    LifeStyleDto:LifeStyleDto,
     interestAndValues: InterestAndValuesAttributes,
   ) {
     let userID = user.id;
     let profileID = user.profileID;
     let lifeStyle = Object.values(LifeStyleDto);
-    // console.log(interestAndValues)
     await this.profileModel.findByIdAndUpdate(profileID, {
       lifeStyle: lifeStyle,
       interest: interestAndValues.interest,
       values: interestAndValues.values,
     });
-    LifeStyleDto.userID = userID;
-    await this.lifeStyleService.createLifeStyle(LifeStyleDto);
+    // LifeStyleDto.userID = userID;
+
+    const lifeStyleInfo = {
+      userID:userID,
+      smoking: LifeStyleDto.smoking,
+      drinking: LifeStyleDto.drinking,
+      pets: LifeStyleDto.pets,
+      execise: LifeStyleDto.execise,
+      education: LifeStyleDto.education,
+      communicationStyle: LifeStyleDto.communicationStyle,
+      relationshipPreference: LifeStyleDto.relationshipPreference,
+      socialMedia: LifeStyleDto.socialMedia,
+    };
+    await this.lifeStyleService.createLifeStyle(lifeStyleInfo);
     return { message: 'life style successfully updated!', data: {} };
   }
   // CREATE: Create a new profile
-  async createProfile(profileDto: ProfileDto): Promise<IProfile> {
-    const createdProfile = new this.profileModel(profileDto);
-    return createdProfile.save();
-  }
+  // async createProfile(profileDto: ProfileDto): Promise<IProfile> {
+  //   const createdProfile = new this.profileModel(profileDto);
+  //   return createdProfile.save();
+  // }
 
   // READ: Find all profiles
   async findAllProfiles(): Promise<IProfile[]> {

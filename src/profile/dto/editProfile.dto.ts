@@ -11,6 +11,7 @@ import {
   IsLongitude,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { SpokenLanguages } from '../profile.schema';
 
 export class EditProfileBasicInfoDto {
   @IsOptional()
@@ -28,7 +29,7 @@ export class EditProfileBasicInfoDto {
 
   @IsOptional()
   @IsArray()
-  languages?: [string];
+  languages?: SpokenLanguages[];
 
   @IsOptional()
   @IsString()

@@ -6,8 +6,9 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { LifeStyle } from './lifestyle.schema';
-import { LifeStyleDto } from './dto/lifestyle.dto';
+import { LifeStyleOnServiceDto } from './dto/lifestyle.dto';
 import { Response } from 'src/common/interface/response.interface';
+import { LifeStyleDto } from 'src/profile/dto/lifeStyleAndValues.dto';
 
 @Injectable()
 export class LifestyleService {
@@ -17,7 +18,7 @@ export class LifestyleService {
   ) {}
 
   // CREATE: Create a new lifestyle entry
-  async createLifeStyle(lifeStyleDto: LifeStyleDto): Promise<LifeStyle> {
+  async createLifeStyle(lifeStyleDto: LifeStyleOnServiceDto): Promise<LifeStyle> {
     const newLifeStyle = new this.lifeStyleModel(lifeStyleDto);
     return newLifeStyle.save();
   }

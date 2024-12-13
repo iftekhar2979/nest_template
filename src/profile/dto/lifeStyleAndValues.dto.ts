@@ -1,58 +1,84 @@
-import { IsString, IsNotEmpty, IsArray, IS_ARRAY } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IS_ARRAY,
+  IsEnum,
+  IsOptional,
+  IsMongoId,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { ObjectId } from 'mongoose';
+import mongoose, { ObjectId, Types } from 'mongoose';
+import { CoreValue, Interest } from '../profile.schema';
+import { CommunicationStyle, DrinkingFrequency, EducationLevel, ExerciseEnum, PetType, RelationshipPreference, SmokingStatus, SocialMediaActivity } from 'src/lifestyle/lifestyle.schema';
 
 export class LifeStyleDto {
-  @IsNotEmpty()
-  @IsString()
-  smoking: string; // No enum, just plain string validation
 
   @IsNotEmpty()
-  @IsString()
-  drinking: string; // No enum, just plain string validation
+  @IsEnum(SmokingStatus, { message: 'Smoking must be Valid !' })
+  smoking: string;
 
   @IsNotEmpty()
-  @IsString()
-  sleepSchedule: string;
+  @IsEnum(DrinkingFrequency, { message: 'Drinking Value must be valid!' })
+  drinking: string;
 
   @IsNotEmpty()
-  @IsString()
-  pets: string; // No enum, just plain string validation
+  @IsEnum(PetType, { message: 'Pet Value on Life style must be valid!' })
+  pets: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(ExerciseEnum, { message: 'Exercise on Life style must be valid!' })
   execise: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(EducationLevel, { message: 'Exercise on Life style must be valid!' })
   education: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(CommunicationStyle, {
+    message: 'Communication style on Life style must be valid!',
+  })
   communicationStyle: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(RelationshipPreference, {
+    message: 'Relationship Preference on life style must be valid!',
+  })
   relationshipPreference: string;
 
   @IsNotEmpty()
-  @IsString()
+  @IsEnum(SocialMediaActivity, {
+    message: 'Social Media on life style must be valid!',
+  })
   socialMedia: string;
-  @IsArray()
-  @IsString({ each: true })
-  values?: string[];
 
   @IsArray()
-  @IsString({ each: true })
-  interest?: string[];
+  @IsEnum(CoreValue, {
+    each: true,
+    message: 'Each value must be a valid values ',
+  })
+  values?: CoreValue[];
+
+  @IsArray()
+  @IsEnum(Interest, {
+    each: true,
+    message: 'Each value must be a valid interests ',
+  })
+  interest?: Interest[];
 }
 
 export class interestAndValues {
   @IsArray()
-  @IsString({ each: true })
-  values?: string[];
+  @IsEnum(CoreValue, {
+    each: true,
+    message: 'Each value must be a valid values ',
+  })
+  values?: CoreValue[];
 
   @IsArray()
-  @IsString({ each: true })
-  interest?: string[];
+  @IsEnum(Interest, {
+    each: true,
+    message: 'Each value must be a valid interests ',
+  })
+  interest?: Interest[];
 }

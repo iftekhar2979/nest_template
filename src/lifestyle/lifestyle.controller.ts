@@ -1,9 +1,10 @@
 import { Controller, Get, Post, Body, Param, Put, Delete, Request, UseGuards } from '@nestjs/common';
 import { LifestyleService } from './lifestyle.service';
-import { LifeStyleDto } from './dto/lifestyle.dto';
+import { LifeStyleOnServiceDto } from './dto/lifestyle.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
+import { LifeStyleDto } from 'src/profile/dto/lifeStyleAndValues.dto';
 // import { LifeStyle } from './dto/lifestyle.dto';  // LifeStyle schema
 
 @Controller('lifestyle')
@@ -11,7 +12,7 @@ export class LifeStyleController {
   constructor(private readonly lifeStyleService: LifestyleService) {}
   // CREATE: Create a new lifestyle entry
   @Post()
-  async createLifeStyle(@Body() lifeStyleDto: LifeStyleDto): Promise<any> {
+  async createLifeStyle(@Body() lifeStyleDto: LifeStyleOnServiceDto): Promise<any> {
     return this.lifeStyleService.createLifeStyle(lifeStyleDto);
   }
 

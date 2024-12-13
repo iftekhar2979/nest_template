@@ -13,12 +13,13 @@ import { IUser } from './users.interface';
 import { pagination } from 'src/common/pagination/pagination';
 import { Pagination } from 'src/common/pagination/pagination.interface';
 import { parse } from 'path';
+import { CreateUserDto } from './dto/createUser.dto';
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
   // Create a new user
 
-  async create(createUserDto: IUser): Promise<User> {
+  async create(createUserDto: CreateUserDto): Promise<User> {
     const newUser = new this.userModel(createUserDto);
     return newUser.save();
   }

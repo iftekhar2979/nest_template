@@ -33,10 +33,11 @@ export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
 
   // CREATE: Create a new profile
-  @Post()
-  async createProfile(@Body() profileDto: ProfileDto): Promise<IProfile> {
-    return this.profileService.createProfile(profileDto);
-  }
+  // @Post()
+  // async createProfile(@Body() profileDto: ProfileDto): Promise<IProfile> {
+  //   return this.profileService.createProfile(profileDto);
+  // }
+
   // READ: Find all profiles
   // @Get()
   // @UseGuards(JwtAuthGuard, RolesGuard)
