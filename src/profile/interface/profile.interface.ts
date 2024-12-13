@@ -1,6 +1,7 @@
 import { CommunicationStyle, DrinkingFrequency, EducationLevel, ExerciseEnum, PetType, RelationshipPreference, SmokingStatus, SocialMediaActivity } from 'src/lifestyle/lifestyle.schema';
-import { interestAndValues } from './../dto/lifeStyleAndValues.dto';
+// import { interestAndValues } from './../dto/lifeStyleAndValues.dto';
 import { Document, Types } from 'mongoose';
+import { CoreValue, Interest } from '../profile.schema';
 
 export interface IProfile extends Document {
   userID: Types.ObjectId; // Reference to the User model
@@ -44,9 +45,13 @@ export interface userLifeStyle {
   communicationStyle: CommunicationStyle;
   relationshipPreference: RelationshipPreference;
   socialMedia: SocialMediaActivity;
+  values:CoreValue[]
+  interest: Interest[];
+
 }
 
+
 export interface InterestAndValuesAttributes {
-  values: string[];
-  interest: string[];
+  values: CoreValue[];
+  interest: Interest[];
 }

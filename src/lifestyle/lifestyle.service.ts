@@ -16,14 +16,6 @@ export class LifestyleService {
     @InjectModel(LifeStyle.name)
     private readonly lifeStyleModel: Model<LifeStyle>,
   ) {}
-
-  // CREATE: Create a new lifestyle entry
-  async createLifeStyle(lifeStyleDto: LifeStyleOnServiceDto): Promise<LifeStyle> {
-    const newLifeStyle = new this.lifeStyleModel(lifeStyleDto);
-    return newLifeStyle.save();
-  }
-
-  // READ: Get lifestyle by userID
   async getLifeStyleByUserID(userID: string): Promise<LifeStyle> {
     const lifestyle = await this.lifeStyleModel.findOne({ userID }).exec();
     if (!lifestyle) {
@@ -31,6 +23,19 @@ export class LifestyleService {
     }
     return lifestyle;
   }
+  // CREATE: Create a new lifestyle entry
+  async createLifeStyle(lifeStyleDto: LifeStyleOnServiceDto): Promise<any> {
+   let userLifestyle= await this.getLifeStyleByUserID(lifeStyleDto.userID)
+   if(!userLifestyle){
+      await this.lifeStyleModel.create(lifeStyleDto);
+   }
+   await this.lifeStyleModel.findOneAndUpdate({userID:lifeStyleDto.userID},{lifeStyleDto});
+  
+    return {message:"User Updated successfully!"}
+  }
+
+  // READ: Get lifestyle by userID
+
 
   // UPDATE: Update lifestyle by ID
   async updateLifeStyle(

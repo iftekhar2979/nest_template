@@ -13,7 +13,7 @@ import {
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { User } from 'src/auth/interface/jwt.info.interfact';
 import { AddLocationDto } from './dto/edit.location.dto';
-import { LifeStyleDto } from './dto/lifeStyleAndValues.dto';
+import { InterestAndValuesDto, LifeStyleDto } from './dto/lifeStyleAndValues.dto';
 @Injectable()
 export class ProfileService {
   constructor(
@@ -23,7 +23,7 @@ export class ProfileService {
   async updateLifeStyle(
     user: User,
     LifeStyleDto:LifeStyleDto,
-    interestAndValues: InterestAndValuesAttributes,
+    interestAndValues: InterestAndValuesDto,
   ) {
     let userID = user.id;
     let profileID = user.profileID;
@@ -33,8 +33,6 @@ export class ProfileService {
       interest: interestAndValues.interest,
       values: interestAndValues.values,
     });
-    // LifeStyleDto.userID = userID;
-
     const lifeStyleInfo = {
       userID:userID,
       smoking: LifeStyleDto.smoking,

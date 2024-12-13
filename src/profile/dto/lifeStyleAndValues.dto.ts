@@ -57,17 +57,17 @@ export class LifeStyleDto {
     each: true,
     message: 'Each value must be a valid values ',
   })
-  values?: CoreValue[];
+  values: CoreValue[];
 
   @IsArray()
   @IsEnum(Interest, {
     each: true,
     message: 'Each value must be a valid interests ',
   })
-  interest?: Interest[];
+  interest: Interest[];
 }
 
-export class interestAndValues {
+export class InterestAndValuesDto {
   @IsArray()
   @IsEnum(CoreValue, {
     each: true,
