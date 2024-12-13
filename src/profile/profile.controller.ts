@@ -11,6 +11,7 @@ import {
   NotFoundException,
   Patch,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { ProfileService } from './profile.service';
 import { ProfileDto } from './dto/profile.dto';
@@ -91,18 +92,27 @@ export class ProfileController {
   @Get()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('user')
-async getSwipesProfile(@Request() req): Promise<any> {
-  let user = req.user;
-  // Ensure user.id is present and is a valid ObjectId
+async getSwipesProfile(@Request() req, @Query('limit') limit: string, @Query('page') page: string): Promise<any> {
+  let user = req.user;  
+
   if (!user.id) {
     throw new NotFoundException("User Not Found!");
   }
-  // Convert user.id to ObjectId if it's a valid string
   const userId = Types.ObjectId.isValid(user.id) ? new Types.ObjectId(user.id) : null;
   if (!userId) {
     throw new BadRequestException("Invalid User ID format.");
   }
-  return this.profileService.swipeProfiles(user);  // Pass userId to your service
+  const parsedLimit = parseInt(limit, 10);
+  const parsedPage = parseInt(page, 10);
+  if (isNaN(parsedLimit) || parsedLimit <= 0) {
+    throw new BadRequestException("Invalid 'limit' value. It must be a positive number.");
+  }
+  if (isNaN(parsedPage) || parsedPage <= 0) {
+    throw new BadRequestException("Invalid 'page' value. It must be a positive number.");
+  }
+
+  // Call service method to fetch swipe profiles with pagination
+  return this.profileService.swipeProfiles(user, parsedLimit, parsedPage);
 }
 
   @Patch('location')

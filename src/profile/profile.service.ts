@@ -13,7 +13,11 @@ import {
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { User } from 'src/auth/interface/jwt.info.interfact';
 import { AddLocationDto } from './dto/edit.location.dto';
-import { InterestAndValuesDto, LifeStyleDto } from './dto/lifeStyleAndValues.dto';
+import {
+  InterestAndValuesDto,
+  LifeStyleDto,
+} from './dto/lifeStyleAndValues.dto';
+import { pagination } from 'src/common/pagination/pagination';
 @Injectable()
 export class ProfileService {
   constructor(
@@ -22,7 +26,7 @@ export class ProfileService {
   ) {}
   async updateLifeStyle(
     user: User,
-    LifeStyleDto:LifeStyleDto,
+    LifeStyleDto: LifeStyleDto,
     interestAndValues: InterestAndValuesDto,
   ) {
     let userID = user.id;
@@ -34,7 +38,7 @@ export class ProfileService {
       values: interestAndValues.values,
     });
     const lifeStyleInfo = {
-      userID:userID,
+      userID: userID,
       smoking: LifeStyleDto.smoking,
       drinking: LifeStyleDto.drinking,
       pets: LifeStyleDto.pets,
@@ -60,8 +64,7 @@ export class ProfileService {
 
   // READ: Find a profile by ID
   async findProfileById(profileId: string): Promise<any> {
-
-    let query=[
+    let query = [
       {
         $match: {
           _id: new ObjectId(profileId),
@@ -91,6 +94,7 @@ export class ProfileService {
             $arrayElemAt: ['$lifestyle', 0], // Flatten lifestyle array
           },
         },
+       
       },
       {
         $addFields: {
@@ -99,6 +103,13 @@ export class ProfileService {
               startDate: '$dOB', // Assuming dOB (Date of Birth) field exists
               endDate: new Date(),
               unit: 'year',
+            },
+          },
+          pictures: {
+            $map: {
+              input: '$gallery',
+              as: 'item',
+              in: '$$item.imageURL',
             },
           },
         },
@@ -112,9 +123,15 @@ export class ProfileService {
           isDeleted: 0,
           __v: 0,
           location: 0,
+          gallery:0,
+          userID:0,
+          galleryID:0,
+          isSubscibed:0,
+          
+
         },
       },
-    ]
+    ];
     let profile = await this.profileModel.aggregate(query);
     return { message: 'User Retrived Successfully', data: profile[0] };
   }
@@ -197,10 +214,240 @@ export class ProfileService {
     }
   }
 
-  async swipeProfiles(user: User): Promise<any> {
+  async swipeProfiles(user: User, limit: number, page: number): Promise<any> {
     // let userProfile = await this.profileModel.findById(user.profileID)
-    let users = await this.profileModel.find({ isDeleted: false });
-    return { message: 'Swipe User Found', data: users };
+    let users = await this.profileModel.findById(user.profileID);
+
+    // let documentCountQuery=[
+    //   {
+    //     $geoNear: {
+    //       near: {
+    //         type: 'Point',
+    //         coordinates: [
+    //           users.location.coordinates[0],
+    //           users.location.coordinates[1],
+    //         ],
+    //       },
+    //       distanceField: 'distance',
+    //       maxDistance: 10000,
+    //       spherical: true,
+    //     },
+    //   },
+    //   {
+    //     $match: {
+    //       isDeleted: false,
+    //       userID: { $ne: new ObjectId(user.id) },
+    //       gender: { $ne: users.gender },
+    //     },
+    //   },
+    //   {
+    //     $addFields: {
+    //       matchedLifeStyles: {
+    //         $setIntersection: ['$lifeStyle', users.lifeStyle],
+    //       },
+    //       matchedInterest: {
+    //         $setIntersection: ['$interest', users.interest],
+    //       },
+    //       matchedValues: {
+    //         $setIntersection: ['$values', users.values],
+    //       },
+    //     },
+    //   },
+    //   {
+    //     $addFields: {
+    //       commonLifeStyles: { $size: '$matchedLifeStyles' },
+    //       commonInterest: { $size: '$matchedInterest' },
+    //       commonValues: { $size: '$matchedValues' },
+    //     },
+    //   },
+    //   {
+    //     $match: {
+    //       commonLifeStyles: { $gte: 1 },
+    //       commonInterest: { $gte: 1 },
+    //       commonValues: { $gte: 1 },
+    //     },
+    //   },
+    //   {
+    //     $count: 'totalCount',
+    //   },
+    // ]
+    let totalCount = await this.profileModel.aggregate([
+      {
+        $geoNear: {
+          near: {
+            type: 'Point',
+            coordinates: [
+              users.location.coordinates[0],
+              users.location.coordinates[1],
+            ],
+          },
+          distanceField: 'distance',
+          maxDistance: 10000,
+          spherical: true,
+        },
+      },
+      {
+        $match: {
+          isDeleted: false,
+          userID: { $ne: new ObjectId(user.id) },
+          gender: { $ne: users.gender },
+        },
+      },
+      {
+        $addFields: {
+          matchedLifeStyles: {
+            $setIntersection: ['$lifeStyle', users.lifeStyle],
+          },
+          matchedInterest: {
+            $setIntersection: ['$interest', users.interest],
+          },
+          matchedValues: {
+            $setIntersection: ['$values', users.values],
+          },
+        },
+      },
+      {
+        $addFields: {
+          commonLifeStyles: { $size: '$matchedLifeStyles' },
+          commonInterest: { $size: '$matchedInterest' },
+          commonValues: { $size: '$matchedValues' },
+        },
+      },
+      {
+        $match: {
+          commonLifeStyles: { $gte: 1 },
+          commonInterest: { $gte: 1 },
+          commonValues: { $gte: 1 },
+        },
+      },
+      {
+        $count: 'totalCount',
+      },
+    ]);
+    console.log(totalCount);
+    let swipesUser = await this.profileModel.aggregate([
+      // First stage: GeoNear (Filter documents by proximity)
+      {
+        $geoNear: {
+          near: {
+            type: 'Point',
+            coordinates: [
+              users.location.coordinates[0], // User's longitude
+              users.location.coordinates[1], // User's latitude
+            ],
+          },
+          distanceField: 'distance', // Field to store distance
+          maxDistance: 10000, // Max distance in meters (adjust as needed)
+          spherical: true, // Use spherical geometry
+        },
+      },
+      // Match Stage: Filter out deleted users and users of the same gender
+      {
+        $match: {
+          isDeleted: false,
+          userID: { $ne: new ObjectId(user.id) }, // Exclude current user
+          gender: { $ne: users.gender }, // Exclude users of the same gender
+        },
+      },
+      // Lookup for Galleries
+      {
+        $lookup: {
+          from: 'galleries',
+          localField: '_id',
+          foreignField: 'profileID',
+          as: 'gallery',
+        },
+      },
+      // Lookup for Users
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: 'profileID',
+          as: 'user',
+        },
+      },
+      // Unwind the 'user' field
+      {
+        $unwind: {
+          path: '$user',
+        },
+      },
+      // Add fields to calculate age, matched life styles, interests, and values
+      {
+        $addFields: {
+          age: {
+            $dateDiff: {
+              startDate: '$dOB', // User's date of birth
+              endDate: new Date(), // Current date
+              unit: 'year', // Calculate difference in years
+            },
+          },
+          pictures: {
+            $map: {
+              input: '$gallery',
+              as: 'item',
+              in: '$$item.imageURL',
+            },
+          },
+          matchedLifeStyles: {
+            $setIntersection: ['$lifeStyle', users.lifeStyle], // Compare lifestyle
+          },
+          matchedInterest: {
+            $setIntersection: ['$interest', users.interest], // Compare interests
+          },
+          matchedValues: {
+            $setIntersection: ['$values', users.values], // Compare values
+          },
+        },
+      },
+      // Add field sizes for the matched attributes
+      {
+        $addFields: {
+          commonLifeStyles: { $size: '$matchedLifeStyles' },
+          commonInterest: { $size: '$matchedInterest' },
+          commonValues: { $size: '$matchedValues' },
+        },
+      },
+      // Match stage: Filter out users that have at least 1 common lifestyle, interest, and value
+      {
+        $match: {
+          commonLifeStyles: { $gte: 1 },
+          commonInterest: { $gte: 1 },
+          commonValues: { $gte: 1 },
+        },
+      },
+      // Pagination: Use $skip and $limit for pagination
+      {
+        $skip: (page - 1) * limit, // Skip the number of documents based on the current page
+      },
+      {
+        $limit: limit, // Limit the number of documents per page
+      },
+      // Project stage: Select fields to return in the response
+      {
+        $project: {
+          name: '$user.name',
+          age: 1,
+          address: 1,
+          pictures: 1,
+          gender: 1,
+          matchedLifeStyles: 1,
+          commonLifeStyles: 1,
+          commonInterest: 1,
+          matchedInterest: 1,
+          commonValues: 1,
+          matchedValues: 1,
+          distance: { $round: [{ $divide: ['$distance', 1000] }, 2] }, // Include the distance field from $geoNear
+        },
+      },
+    ]);
+    let count = totalCount[0].totalCount;
+    return {
+      message: `${count} Users Found`,
+      data: swipesUser,
+      pagination: pagination(limit, page, count),
+    };
   }
 
   // DELETE: Delete a profile by ID

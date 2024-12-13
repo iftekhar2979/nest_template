@@ -18,6 +18,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { GalleryModule } from './gallery/gallery.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { SubscribedPlanModule } from './subscribed-plan/subscribed-plan.module';
+import { MatchModule } from './match/match.module';
+import { ChatController } from './chat/chat.controller';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports:  [
@@ -32,8 +37,12 @@ import { join } from 'path';
     ProfileModule,
     LifestyleModule,
     GalleryModule,
+    SubscriptionModule,
+    SubscribedPlanModule,
+    MatchModule,
+    ChatModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, ChatController],
   providers: [
     {
       provide: APP_FILTER,

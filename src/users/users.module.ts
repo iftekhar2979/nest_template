@@ -11,7 +11,7 @@ import { Reflector } from '@nestjs/core';
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.register({
       secret: 'yourSecretKey', // You should move this to a config file or env variables
-      signOptions: { expiresIn: '1h' }, // Token expiration time
+      signOptions: { expiresIn: '30d' }, // Token expiration time
     }),
     Reflector,  // Register Reflector for metadata reflection
   ],

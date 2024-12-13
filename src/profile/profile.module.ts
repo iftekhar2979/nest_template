@@ -16,7 +16,7 @@ import { LifestyleService } from 'src/lifestyle/lifestyle.service';
     LifestyleModule,
     JwtModule.register({
       secret: 'yourSecretKey', // You should move this to a config file or env variables
-      signOptions: { expiresIn: '1h' }, // Token expiration time
+      signOptions: { expiresIn: '30d' }, // Token expiration time
     }),
     UsersModule,
   ],
