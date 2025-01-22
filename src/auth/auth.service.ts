@@ -1,3 +1,4 @@
+import { UserService } from 'src/users/users.service';
 import { IProfile } from './../profile/interface/profile.interface';
 import { resetPasswordDto, forgetPasswordDto } from './dto/auth.dto';
 // import { EmailService } from './../common/mailer/sendMail';
@@ -10,11 +11,12 @@ import {
   Injectable,
   NotFoundException,
   Request,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, ObjectId } from 'mongoose';
-import { comparePassword, hashPassword } from 'src/common/bycrypt/bycrypt';
+import { comparePassword, comparePasswordWithArgon, hashPassword } from 'src/common/bycrypt/bycrypt';
 import { User } from 'src/users/users.schema';
 import { profile, error } from 'console';
 import { IUser } from 'src/users/users.interface';
@@ -35,86 +37,164 @@ export class AuthService {
     private jwtService: JwtService, // Injecting the JwtService for token generation
     private emailService: EmailService,
   ) {}
-
+  async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
+    return await this.userModel.findOne({ name: createUserDto.name });
+  }
+  async checkUserExistWiththeEmail(
+    createUserDto: CreateUserDto,
+  ): Promise<User> {
+    return await this.userModel.findOne({ email: createUserDto.email });
+  }
+  async checkUserExistWithPhone(createUserDto: CreateUserDto): Promise<User> {
+    return await this.userModel.findOne({ phone: createUserDto.phone });
+  }
   async create(createUserDto: CreateUserDto): Promise<any> {
-    // Create the user
-    if(createUserDto.password){
-      createUserDto.userCreatedMethod="custom"
+    // Check if the user already exists
+    console.time("STARTED")
+    console.time('userExistCheck');
+    const existingUser = await this.userModel.findOne({
+      $or: [
+        { name: createUserDto.name },
+        { email: createUserDto.email },
+        { phone: createUserDto.phone },
+      ],
+    });
+    console.timeEnd('userExistCheck');
+    if (existingUser) {
+      if (existingUser.name === createUserDto.name) {
+        throw new BadRequestException('User with this name already exists!');
+      }
+      if (existingUser.email === createUserDto.email) {
+        throw new BadRequestException('User with this Email already exists!');
+      }
+      if (existingUser.phone === createUserDto.phone) {
+        throw new BadRequestException(
+          'User with this Phone Number already exists!',
+        );
+      }
     }
-    const newUser = new this.userModel({...createUserDto});
-    
-    // Generate OTP
+    // Create the user
+    const newUser = new this.userModel({ ...createUserDto });
     let otp = generateOtp();
     const currentDate = new Date();
-    currentDate.setMinutes(currentDate.getMinutes() + 3);  // OTP expiration time (3 minutes from now)
-  
+    currentDate.setMinutes(currentDate.getMinutes() + 3); // OTP expiration time (3 minutes from now)
+
     // Create OTP document
     const saveOtp = new this.otpModel({
       oneTimePassword: otp,
       userID: newUser._id,
       expiredAt: currentDate,
     });
-  
     // Send OTP email
-    await this.emailService.sendOtpEmail(newUser.email, otp, newUser.name);
-  
-    // Create the profile information
-    const profileInfo = new this.profileModel({
-      gender: createUserDto.gender,
-      userID: newUser._id,
-      height: createUserDto.height,
-      dOB: createUserDto.dOB,  // Corrected from createUserDto.height
-    });
-  
-    // Save the profile first to get the profile ID (_id)
-    const savedProfile = await profileInfo.save();
-  
-    // Now that the profile is saved, assign the profile ID to the user
-    newUser.profileID = savedProfile._id as ObjectId;  // Cast _id to ObjectId if necessary
-  
+    console.time('Email Service');
+ this.emailService
+      .sendOtpEmail(newUser.email, otp, newUser.name)
+      .then(() => {
+        console.log(`OTP email sent to ${newUser.email}`);
+      })
+      .catch((error) => {
+        console.error('Error sending OTP email:', error);
+      });
+      console.timeEnd('Email Service');
     // Prepare JWT payload
     const payload = {
       email: newUser.email,
       id: newUser._id,
       role: newUser.role,
-      profileID: savedProfile._id,  // Ensure to use the saved profile ID
       name: newUser.name,
     };
-  
     // Sign the JWT token
     const token = this.jwtService.sign(payload);
-  
+    console.time('Save User');
+    let savedUser = await newUser.save();
+    console.timeEnd('Save User');
     // Save the user, OTP, and profile information
-    const savedUser = await newUser.save();
-    await saveOtp.save();
-  
-    // Remove password before sending user data in the response
     savedUser.password = undefined;
-  
+    savedUser.isEmailVerified = undefined;
+    savedUser.isDeleted = undefined;
+    console.time('Save OTP');
+    await saveOtp.save();
+    console.timeEnd('Save OTP');
+    console.timeEnd("STARTED")
     // Return the saved user and JWT token
-    return { data: savedUser, token };
+    return {
+      message:
+        'Please Check Your Email and Verify you email to get full access',
+      data: savedUser,
+      token,
+    };
   }
-  
-  
+  async checkOtpExist(userId: string) {
+    return await this.otpModel.findOne({ userID: userId });
+  }
+  async generateOtpModel(userId: string) {
+    let otp = generateOtp();
+    const currentDate = new Date();
+    currentDate.setMinutes(currentDate.getMinutes() + 3); // OTP expiration time (3 minutes from now)
+    return new this.otpModel({
+      oneTimePassword: otp,
+      userID: userId,
+      expiredAt: currentDate,
+    });
+  }
+
   async find(authDto) {
     let user = await this.userModel.findOne({ email: authDto.email });
     if (!user) {
       throw new BadRequestException('User not Found!');
     }
-    let isMatch = await comparePassword(authDto.password, user.password);
+    let isMatch = await comparePasswordWithArgon(authDto.password, user.password);
     if (!isMatch) {
       throw new BadRequestException('Invalid Credential!');
     }
-    // Sign the JWT and return it
+    user.password = undefined;
+    if (!user.isEmailVerified) {
+      let checkOtpExist = await this.checkOtpExist(user._id.toString());
+      if (checkOtpExist) {
+        const payload = {
+          id: user._id,
+          tokenFor: 'email-verification',
+        };
+        const token = this.jwtService.sign(payload);
+        throw new UnauthorizedException({
+          message:
+            'Please Check Your Email and Verify Your Email First to access Profile',
+          error: 'Unauthorized',
+          details:
+            'If you did not receive a verification email, please check your spam folder or request a new verification Code.',
+          token: token,
+        });
+      }
+      let generateOtpModel = await this.generateOtpModel(user._id.toString());
+      await this.emailService.sendOtpEmail(
+        user.email,
+        generateOtpModel.oneTimePassword,
+        user.name,
+      );
+      generateOtpModel.save();
+
+      const payload = {
+        id: user._id,
+        tokenFor: 'email-verification',
+      };
+      const token = this.jwtService.sign(payload);
+      throw new UnauthorizedException({
+        message:
+          'You are Not Verified User . Please Verify Your email first to access Profile',
+        error: 'Unauthorized',
+        details:
+          'If you did not receive a verification email, please check your spam folder or request a new verification Code.',
+        token: token,
+      });
+    }
     const payload = {
       email: user.email,
       id: user._id,
       role: user.role,
-      profileID: user.profileID,
       name: user.name,
+      tokenFor: 'auth',
     };
-    const token = this.jwtService.sign(payload); // Sign the JWT
-    user.password = undefined;
+    const token = this.jwtService.sign(payload);
     return { message: 'Logged In Successfully', data: user, token };
   }
   async verifyOtp(user: Omit<IUser, 'password'>, code: string) {
@@ -132,17 +212,24 @@ export class AuthService {
     });
     await this.otpModel.deleteOne({ userID: user.id, code: code });
     let payload = {};
+
+    //if the email is already verified ...
     if (updatedUser.isEmailVerified) {
       payload = {
         id: user.id,
+        name: user.name,
+        email: user.email,
         role: user.role,
-        tokenFor: 'email-verification',
+        tokenFor: 'forget-password',
       };
     }
+    //otherwise token for email verification
     payload = {
+      email: user.email,
       id: user.id,
+      name: user.name,
       role: user.role,
-      tokenFor: 'forget-password',
+      tokenFor: 'email-verification',
     };
     const token = this.jwtService.sign(payload);
     return { message: 'OTP Verified Successfully', data: {}, token };

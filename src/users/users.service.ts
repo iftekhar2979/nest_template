@@ -23,6 +23,12 @@ export class UserService {
     const newUser = new this.userModel(createUserDto);
     return newUser.save();
   }
+  async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
+    return  await this.userModel.findOne({   name: createUserDto.name  });
+  }
+  async checkUserExistWiththeEmail(createUserDto: CreateUserDto): Promise<User> {
+    return  await this.userModel.findOne({   email: createUserDto.email  });
+  }
   // Get all users
   
   async findAll(query): Promise<{ data: User[]; pagination: Pagination }> {

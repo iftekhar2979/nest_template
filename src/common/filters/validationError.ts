@@ -8,15 +8,13 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
     const request = context.getRequest<Request>();
-    // console.log("Exception from forbidden",exception)
     const validationErrors = exception.getResponse() as any;
-    // console.log(exception)
     response.status(exception.getStatus()).json({
       path: request.url,
-      statusCode: exception.getStatus(),
-      message: "Validation Error!",
-      error:validationErrors.message,
-      status:"fail"
+      status: exception.getStatus(),
+      message: validationErrors.message,
+      error: "Validation Error!",
+      ok:false
     });
   }
 }

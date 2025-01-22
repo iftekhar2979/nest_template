@@ -15,13 +15,29 @@ export class UnauthorizedExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
-
+console.log("Here is al about exception",exceptionResponse)
     // You can customize how the error is formatted
+    if(exceptionResponse['message'] === 'jwt expired'){
+      exceptionResponse['message']='Session Expired'
+    }
+    if(exceptionResponse['token']){
+     return response.status(status).json({
+        path: ctx.getRequest().url,
+        ok: false,
+        status: status,
+        message: exceptionResponse['message'] || 'Internal server error',
+        error: exceptionResponse['error'] || 'Error',
+        details: exceptionResponse['details'] || null,
+        token: exceptionResponse['token'] || null,
+      });
+    }
     response.status(status).json({
-      status: 'fail',
-      statusCode: status,
+      path: ctx.getRequest().url,
+      ok: false,
+      status: status,
       message: exceptionResponse['message'] || 'Internal server error',
       error: exceptionResponse['error'] || 'Error',
+      details: exceptionResponse['details'] || null,
     });
   }
 }

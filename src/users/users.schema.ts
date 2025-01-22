@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import * as bcrypt from 'bcryptjs'; // Import bcryptjs
+import * as argon2 from 'argon2';
 
 // Define the User schema using the Schema decorator
 @Schema({ timestamps: true })
@@ -21,29 +22,14 @@ export class User extends Document {
   @Prop({ enum: ['user', 'admin'], default: 'user' })
   role: 'user' | 'admin';
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Profile', unique: true })
-  profileID: mongoose.Schema.Types.ObjectId | null;
-
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Profile', default: null })
-  galleryID: mongoose.Schema.Types.ObjectId | null;
-
-  @Prop({ required: true })
-  privacyPolicyAccepted: boolean;
+  profileID: mongoose.Schema.Types.ObjectId | null;
 
   @Prop({ default: false })
   isEmailVerified: boolean;
 
   @Prop({ default: false })
-  isVerifiedByAdmin: boolean;
-
-  @Prop({ default: false })
-  isBlockedByAdmin: boolean;
-
-  @Prop({ default: false })
   isDeleted: boolean;
-
-  @Prop({ enum: ['google', 'facebook', 'custom'], default: 'custom' })
-  userCreatedMethod: string;
 }
 
 // Create the schema and apply pre-save hook outside the class
@@ -52,9 +38,19 @@ export const UserSchema = SchemaFactory.createForClass(User);
 // Pre-save hook to hash the password before saving
 UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
-    // Only hash password if it was modified
-    const salt = await bcrypt.genSalt(10); // Generate salt with 10 rounds
-    this.password = await bcrypt.hash(this.password, salt); // Hash password
+    console.time("Password Hashed");
+
+    try {
+      // Hash the password using Argon2
+      this.password = await argon2.hash(this.password);
+      console.timeEnd("Password Hashed");
+    } catch (error) {
+      console.error('Error hashing password:', error);
+      next(error);  // If hashing fails, propagate the error
+    }
   }
-  next(); // Proceed with saving the user
+  next(); 
+  
 });
+
+// UserSchema.index({  }); // Create a compound index on email and phone

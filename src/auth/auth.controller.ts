@@ -25,26 +25,26 @@ export class AuthController {
   async login(@Body() authDto: authDto) {
     return this.authService.find(authDto);
   }
-  @Post('verify-otp')
+  @Post('otp/verify')
   @UseGuards(JwtAuthGuard)
   VerifyOtp(@Request() req, @Body() body: { code: string }) {
     const user = req.user; // Access user data from JWT
     const code = body.code;
     return this.authService.verifyOtp(user, code);
   }
-  @Post('resend-otp')
+  @Post('otp/send')
   @UseGuards(JwtAuthGuard)
   resendOtp(@Request() req) {
     const user = req.user; // Access user data from JWT
     return this.authService.resendOtp(user);
   }
-  @Post('reset-password')
+  @Post('password/reset')
   @UseGuards(JwtAuthGuard)
   resetPassword(@Request() req, @Body() resetPasswordDto: resetPasswordDto) {
     const user = req.user; // Access user data from JWT
     return this.authService.resetPassword(user, resetPasswordDto);
   }
-  @Post('forget-password')
+  @Post('password/forgot')
   @UseGuards(JwtAuthGuard)
   forgetPassword(@Request() req, @Body() forgetPasswordDto:forgetPasswordDto) {
     const user = req.user; // Access user data from JWT

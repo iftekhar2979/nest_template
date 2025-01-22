@@ -1,10 +1,18 @@
 import * as bcrypt from 'bcryptjs';
+import * as argon from 'argon2';
 
 export async function comparePassword(
   plainTextPassword: string,
   hashedPassword: string,
 ): Promise<boolean> {
   return bcrypt.compare(plainTextPassword, hashedPassword);
+}
+
+export async function comparePasswordWithArgon(
+  plainTextPassword: string,
+  hashedPassword: string,
+): Promise<boolean> {
+  return argon.verify(hashedPassword,plainTextPassword);
 }
 
 

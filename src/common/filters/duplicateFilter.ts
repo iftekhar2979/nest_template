@@ -20,7 +20,7 @@ export class MongoDuplicateKeyExceptionFilter implements ExceptionFilter {
       response.status(409).json({
         status: 'fail',
         statusCode: 400,
-        message: `${Object.keys(exception?.keyPattern)[0]} is already Exist!!`,
+        message: `Document is already Exist!!`,
         path: request.url,
       });
     } else {
