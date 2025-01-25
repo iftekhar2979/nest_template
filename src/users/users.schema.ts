@@ -27,7 +27,8 @@ export class User extends Document {
 
   @Prop({ default: false })
   isEmailVerified: boolean;
-
+  @Prop({ required: true, default: 'uploads/user.jpg' })
+  profilePicture: string;
   @Prop({ default: false })
   isDeleted: boolean;
 }
@@ -38,19 +39,19 @@ export const UserSchema = SchemaFactory.createForClass(User);
 // Pre-save hook to hash the password before saving
 UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
-    console.time("Password Hashed");
+    console.time('Password Hashed');
 
     try {
       // Hash the password using Argon2
       this.password = await argon2.hash(this.password);
-      console.timeEnd("Password Hashed");
+      console.timeEnd('Password Hashed');
     } catch (error) {
       console.error('Error hashing password:', error);
-      next(error);  // If hashing fails, propagate the error
+      next(error); // If hashing fails, propagate the error
     }
   }
-  next(); 
-  
+  next();
 });
 
-// UserSchema.index({  }); // Create a compound index on email and phone
+//  UserSchema.index({  }); // Create a compound index on email and phone
+UserSchema.index({ name: 'text', email: 'text', phone: 'text' });

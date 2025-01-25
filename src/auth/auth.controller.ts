@@ -32,11 +32,15 @@ export class AuthController {
     const code = body.code;
     return this.authService.verifyOtp(user, code);
   }
-  @Post('otp/send')
+  @Post('otp/resend')
   @UseGuards(JwtAuthGuard)
   resendOtp(@Request() req) {
     const user = req.user; // Access user data from JWT
     return this.authService.resendOtp(user);
+  }
+  @Post('otp/send-for-forgot-password')
+  resendOtpForForget(@Request() req, @Body('email') email: string) {
+    return this.authService.resendOtpForForget(email);
   }
   @Post('password/reset')
   @UseGuards(JwtAuthGuard)
@@ -47,7 +51,7 @@ export class AuthController {
   @Post('password/forgot')
   @UseGuards(JwtAuthGuard)
   forgetPassword(@Request() req, @Body() forgetPasswordDto:forgetPasswordDto) {
-    const user = req.user; // Access user data from JWT
+    const user = req.user; 
     return this.authService.forgetPassword(user, forgetPasswordDto);
   }
 }

@@ -10,7 +10,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
-    console.log(exceptionResponse)
+    console.log("expection is Here",exceptionResponse)
     // You can customize how the error is formatted
     response.status(status).json({
       statusCode: status,

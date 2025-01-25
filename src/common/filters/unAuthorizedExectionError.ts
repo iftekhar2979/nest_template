@@ -15,7 +15,6 @@ export class UnauthorizedExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
-console.log("Here is al about exception",exceptionResponse)
     // You can customize how the error is formatted
     if(exceptionResponse['message'] === 'jwt expired'){
       exceptionResponse['message']='Session Expired'

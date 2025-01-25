@@ -145,34 +145,16 @@ export class Profile extends Document {
     unique: true,
   })
   userID: mongoose.Schema.Types.ObjectId;
-  @Prop()
+  @Prop({ required: false, trim: true, minlength: 2, maxlength: 100 })
   bio: string;
-  @Prop({ required: false, trim: true })
+  @Prop({ required: true, trim: true, minlength: 2, maxlength: 30 })
+  fullName: string;
+  @Prop({ required: false, minlength: 2, maxlength: 25 })
   country: string;
-  @Prop()
-  profilePictureUrl: string;
-  @Prop({
-    type: [String],
-    enum: Object.values(SpokenLanguages),
-    required: true,
-  })
-  languages: SpokenLanguages[];
   @Prop({ required: true })
   dOB: Date;
   @Prop()
-  education: string;
-  @Prop()
-  height: string;
-  @Prop()
   gender: string;
-  @Prop()
-  subscribedPlanID: string;
-  @Prop({
-    type: [String],
-    enum: Object.values(LifeStyleEnum),
-    required: true,
-  })
-  lifeStyle: LifeStyleEnum[];
   @Prop()
   address: string;
   @Prop({ type: Object })
@@ -180,20 +162,7 @@ export class Profile extends Document {
     type: 'Point';
     coordinates: [number];
   };
-  @Prop()
-  age: number;
-  @Prop({ type: [String], enum: Object.values(CoreValue), required: true })
-  values: CoreValue[];
-  @Prop({ type: [String], enum: Object.values(Interest), required: true })
-  interest: Interest[];
-  @Prop({ default: false })
-  isDeleted: boolean;
-  @Prop({ default: false })
-  isActive: boolean;
-  @Prop({ default: false })
-  isSubscribed: boolean;
-  @Prop({ default: false })
-  isBatchAvailable: boolean;
+
 }
 
 // Create the schema and apply pre-save hook outside the class

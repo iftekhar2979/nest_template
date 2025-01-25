@@ -4,6 +4,7 @@ import { Document, Types } from 'mongoose';
 import { CoreValue, Interest } from '../profile.schema';
 
 export interface IProfile extends Document {
+  // _id?: Types.ObjectId;
   userID: Types.ObjectId; // Reference to the User model
   bio?: string;
   country: string;

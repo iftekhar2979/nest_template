@@ -14,6 +14,9 @@ import {
   ConflictException,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Request,
 } from '@nestjs/common';
 import { UserService } from './users.service';
 import { IUser } from './users.interface';
@@ -22,6 +25,8 @@ import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerConfig } from 'src/common/multer/multer.config';
 
 
 @Controller('users')
@@ -61,4 +66,14 @@ export class UserController {
   async delete(@Param('id') id: string) {
     return this.userService.delete(id);
   }
+
+   @Post("profile-picture")
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('user')
+    @UseInterceptors(FileInterceptor('file', multerConfig))
+    imagesUpload(@Request() req, @UploadedFile() file: Express.Multer.File) {
+    
+      let user = req.user; // Assuming user info is in the request
+      return this.userService.uploadProfilePicture(user, file);
+    }
 }

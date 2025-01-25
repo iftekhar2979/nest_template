@@ -51,7 +51,7 @@ export class GalleryController {
     @Request() req,
     @UploadedFiles() files: { files?: Express.Multer.File[] },
   ) {
-    let user = req.user; // Assuming user info is in the request
+    let user = req.user; 
     return this.galleryService.addImage(user, files.files);
   }
   @Post()
@@ -68,7 +68,7 @@ export class GalleryController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
   deleteOne(@Request() req, @Param() imageID: { id: string }) {
-    console.log('imageId', imageID.id);
+    // console.log('imageId', imageID.id);
     let user = req.user; // Assuming user info is in the request
     return this.galleryService.removeImage(user, imageID.id);
   }

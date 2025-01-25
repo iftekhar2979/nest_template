@@ -59,7 +59,7 @@ export class GalleryService {
 
   async addSingleImage(user: User, file: FileType): Promise<any> {
     let count = await this.galleryModel.countDocuments({ userID: user.id });
-    console.log(count);
+    // console.log(count);
     if (count >= 6) {
       throw new BadRequestException(
         'More than 6 image not allowed to upload !',
