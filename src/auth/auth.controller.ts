@@ -19,6 +19,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
   @Post('register')
   async create(@Body() createUserDto: CreateUserDto) {
+    console.log("==========",createUserDto);
+    
     return this.authService.create(createUserDto);
   }
   @Post('login')

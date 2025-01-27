@@ -145,9 +145,7 @@ export class Profile extends Document {
     unique: true,
   })
   userID: mongoose.Schema.Types.ObjectId;
-  @Prop({ required: false, trim: true, minlength: 2, maxlength: 100 })
-  bio: string;
-  @Prop({ required: true, trim: true, minlength: 2, maxlength: 30 })
+  @Prop({ required: false, trim: true, minlength: 2, maxlength: 30 })
   fullName: string;
   @Prop({ required: false, minlength: 2, maxlength: 25 })
   country: string;
@@ -155,16 +153,14 @@ export class Profile extends Document {
   dOB: Date;
   @Prop()
   gender: string;
-  @Prop()
+  @Prop({required:true})
   address: string;
   @Prop({ type: Object })
   location: {
     type: 'Point';
     coordinates: [number];
   };
-
 }
-
 // Create the schema and apply pre-save hook outside the class
 export const ProfileSchema = SchemaFactory.createForClass(Profile);
 ProfileSchema.index({

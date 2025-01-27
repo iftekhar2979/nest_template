@@ -1,19 +1,10 @@
-// import { IsDate } from 'class-validator';
-// src/user/dto/create-user.dto.ts
+
 import {
   IsString,
   IsEmail,
-  IsBoolean,
-  IsOptional,
-  IsEnum,
-  isString,
-  IsDate,
-  IsDateString,
   IsPhoneNumber,
-  ValidateIf,
   IsStrongPassword,
 } from 'class-validator';
-import mongoose from 'mongoose';
 
 export class CreateUserDto {
   @IsString({})
@@ -26,7 +17,6 @@ export class CreateUserDto {
     minLength: 6,
   }, 
   {
-    
     message: 'Password is not strong enough!',
   }
 )
@@ -35,6 +25,5 @@ export class CreateUserDto {
   email: string;
   @IsPhoneNumber()
   phone: string;
-  @IsEnum(['user', 'admin'], { message: 'Role Is not Valid!' })
-  role: 'user' | 'admin';
+
 }

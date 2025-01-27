@@ -53,9 +53,11 @@ export class AuthService {
     return await this.userModel.findOne({ phone: createUserDto.phone });
   }
   async create(createUserDto: CreateUserDto): Promise<any> {
+    console.log("createUserDto===>",createUserDto);
+    
     // Check if the user already exists
-    console.time('STARTED');
-    console.time('userExistCheck');
+    // console.time('STARTED');
+    // console.time('userExistCheck===============');
     const existingUser = await this.userModel.findOne({
       $or: [
         { name: createUserDto.name },
@@ -63,9 +65,14 @@ export class AuthService {
         { phone: createUserDto.phone },
       ],
     });
-    console.timeEnd('userExistCheck');
+    // console.timeEnd('userExistCheck');
+    console.log("===========",existingUser);
+    console.log("===========",createUserDto);
+    
     if (existingUser) {
       if (existingUser.name === createUserDto.name) {
+        console.log('User with this name already exists!=======');
+        
         throw new BadRequestException('User with this name already exists!');
       }
       if (existingUser.email === createUserDto.email) {
@@ -118,8 +125,8 @@ export class AuthService {
     savedUser.isDeleted = undefined;
     console.time('Save OTP');
     await saveOtp.save();
-    console.timeEnd('Save OTP');
-    console.timeEnd('STARTED');
+    // console.timeEnd('Save OTP');
+    // console.timeEnd('STARTED');
     // Return the saved user and JWT token
     return {
       message:
@@ -143,6 +150,8 @@ export class AuthService {
   }
 
   async find(authDto) {
+    console.log(authDto);
+    
     let user = await this.userModel.findOne({ email: authDto.email });
     if (!user) {
       throw new BadRequestException('User not Found!');
@@ -309,9 +318,9 @@ export class AuthService {
     return { message: 'Password Updated Successfully', data: {} };
   }
   async forgetPassword(payload, forgetPasswordDto) {
-    if (payload.tokenFor === 'email-verification') {
-      throw new BadGatewayException('Verification was for email verification!');
-    }
+    // if (payload.tokenFor === 'email-verification') {
+    //   throw new BadGatewayException('Verification was for email verification!');
+    // }
     if (forgetPasswordDto.password !== forgetPasswordDto.confirmPassword) {
       throw new BadRequestException(
         'Password and Confirm Password not matched!!',

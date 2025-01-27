@@ -27,8 +27,8 @@ export class User extends Document {
 
   @Prop({ default: false })
   isEmailVerified: boolean;
-  @Prop({ required: true, default: 'uploads/user.jpg' })
-  profilePicture: string;
+  @Prop({ required: false, default: null })
+  profilePicture: string | null;
   @Prop({ default: false })
   isDeleted: boolean;
 }
@@ -54,4 +54,4 @@ UserSchema.pre('save', async function (next) {
 });
 
 //  UserSchema.index({  }); // Create a compound index on email and phone
-UserSchema.index({ name: 'text', email: 'text', phone: 'text' });
+UserSchema.index({ name: 'text', phone: 'text' });

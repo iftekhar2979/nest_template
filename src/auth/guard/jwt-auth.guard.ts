@@ -27,7 +27,6 @@ export class JwtAuthGuard {
     try {
       const payload = await this.jwtService.verifyAsync(token);
       const user = await this.userService.findOne(payload.id);
-      // console.log(user)
       if (!user) {
         throw new BadRequestException('User is Not Available!');
       }

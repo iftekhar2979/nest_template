@@ -21,16 +21,15 @@ export class ProfileDto {
   @IsString()
   fullName: string;
   @IsString()
-  bio?: string;
-
+  address: string;
   @IsDate()
   @Type(() => Date)
   dOB?: Date;
 
   @IsString({ message: 'Gender must string' })
-  @IsEnum(['male', 'female', 'other'], {
+  @IsEnum(['Male', 'Female', 'Others'], {
     message:
-      'Gender must be one of the following values: male | female | other 🙂',
+      'Gender must be one of the following values: Male | Female | Others 🙂',
   })
   gender?: string;
 

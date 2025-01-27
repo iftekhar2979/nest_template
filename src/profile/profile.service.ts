@@ -23,8 +23,8 @@ export class ProfileService {
   }
   async registerProfile(profileDto: ProfileDto): Promise<any> {
 
-    const newProfile =await this.createProfile(profileDto) as any;
-    console.log("Proifle",newProfile)
+    const newProfile = await this.createProfile(profileDto) as any;
+    console.log("Proifle==========?",newProfile)
    await this.userModel.findByIdAndUpdate(
       profileDto.userID,
       { profileID: newProfile._id },
