@@ -17,24 +17,12 @@ import { ProfileService } from './profile.service';
 import { ProfileDto } from './dto/profile.dto';
 import {
   IProfile,
-  userLifeStyle,
-  InterestAndValuesAttributes,
 } from './interface/profile.interface';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
-import {
-  LifeStyleDto,
-  InterestAndValuesDto,
-} from './dto/lifeStyleAndValues.dto';
-import { LifestyleService } from 'src/lifestyle/lifestyle.service';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
-import {
-  omitProperties,
-  pickProperties,
-} from 'src/common/utils/omitProperties';
 import { EditProfileBasicInfoDto } from './dto/editProfile.dto';
 import { AddLocationDto } from './dto/edit.location.dto';
-import { Types } from 'mongoose';
 
 @Controller('profiles')
 export class ProfileController {

@@ -1,16 +1,19 @@
-const fs = require('fs');
-const path = require('path');
-import { Injectable } from '@nestjs/common';
+// src/user/user.service.ts
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model, mongo } from 'mongoose';
 import { User } from './users.schema';
 import { IUser } from './users.interface';
 import { pagination } from 'src/common/pagination/pagination';
 import { Pagination } from 'src/common/pagination/pagination.interface';
-// import path, { parse } from 'path';
+import { parse } from 'path';
 import { CreateUserDto } from './dto/createUser.dto';
-import { FileType } from 'src/gallery/interface/gallery.interface';
-import { resizeImage } from 'src/common/multer/multer.config';
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
@@ -37,60 +40,83 @@ export class UserService {
   }
   // Get all users
 
-  async findAll(query): Promise<{ data: User[]; pagination: Pagination }> {
+  async findAll(query: {
+    term: string;
+    page: string;
+    limit: string;
+  }): Promise<{ data: User[]; pagination: Pagination }> {
     let page = parseFloat(query.page);
     let limit = parseFloat(query.limit);
     const skip = (page - 1) * limit;
     const data = await this.userModel
-      .find()
+      .find({
+      $or: [
+        { name: { $regex: new RegExp(query.term, 'i') } },
+        { email: { $regex: new RegExp(query.term, 'i') } },
+      ],
+      isDeleted:false,
+      role: 'user',
+      })
       .select('-password')
+      .sort({createdAt:-1})
       .skip(skip)
       .limit(limit)
       .exec();
-    const total = await this.userModel.countDocuments().exec();
+    const total = await this.userModel
+      .countDocuments({
+        $or: [
+          { name: { $regex: new RegExp(query.term, 'i') } },
+          { email: { $regex: new RegExp(query.term, 'i') } },
+        ],
+        isDeleted:false,
+        role: 'user',
+        })
+      .exec();
     return { data, pagination: pagination(limit, page, total) };
   }
-  // Find a user by ID
-  async findOne(id: string): Promise<User> {
-    return this.userModel.findById(id).select('-password').exec();
-  }
 
-  // Update a user by ID
-  async update(id: string, updateUserDto: IUser): Promise<User> {
+  // Find a user by ID
+  findOne(id: string) {
     return this.userModel
-      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .findById(id, {
+        pin: 0,
+        pinAttempts: 0,
+        isDeleted: 0,
+        isEmailVerified: 0,
+        profileID: 0,
+      })
+      .select('-password')
+      .exec();
+  }
+  count() {
+    return this.userModel
+      .countDocuments()
       .exec();
   }
 
-  // Delete a user by ID
+  // Update a user by ID
+  async update(id: string, updateUserDto: any): Promise<User> {
+    return await this.userModel
+      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .select(
+        '-password -pin -pinAttempts -isDeleted -isEmailVerified -profileID',
+      )
+      .exec();
+  }
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userModel.findOne({ email }).exec();
+  }
   async delete(id: string): Promise<any> {
     return this.userModel.findByIdAndDelete(id).exec();
   }
-  async uploadProfilePicture(user: User, file: FileType): Promise<any> {
-    // const filePath=`${file.destination}/${file.filename}`
-
-    //working With thread to image resize
-    fs.readFile(file.path, async (err, data) => {
-      const resizedBuffer = await resizeImage(data, 800, 600);
-      // Save the resized buffer to a temporary file, then proceed with storage
-      const tempPath = path.join(
-        __dirname,
-        '..',
-        '..',
-        'public',
-        'uploads',
-        file.filename,
-      );
-      fs.writeFileSync(tempPath, resizedBuffer);
-      data = fs.readFileSync(tempPath); // Read the resized image buffer
-      if (err) {
-        throw new Error('Error reading file buffer');
-      }
-    });
+  async uploadProfilePicture(user: User, file): Promise<any> {
     await this.updateProfilePicture(
       user.id,
-      `${file.destination}/${file.filename}`,
+      `${file.location.split('/').slice(3, 5).join('/')}`,
     );
-    return { message: 'Profile Picture Uploaded Successfully', data: {} };
+    return {
+      message: 'Profile Picture Uploaded Successfully',
+      data: { url: file.location.split('/').slice(3, 5).join('/') },
+    };
   }
 }

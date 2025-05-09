@@ -10,14 +10,21 @@ import { EmailserviceModule } from './emailservice/emailservice.module';
 import { ProfileModule } from './profile/profile.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
-import { ChatController } from './chat/chat.controller';
-import { ChatModule } from './chat/chat.module';
-import { EventsModule } from './events/events.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { SeederService } from './seed/seedService';
+import { SeedModule } from './seed/seed.module';
+import { SettingsModule } from './settings/settings.module';
 
+if(process.env.DB_URL){
+  console.log("No Database Url Injected yet")
+}
+const config = new ConfigService()
 @Module({
   imports:  [
-    // Connect to MongoDB
-    MongooseModule.forRoot('mongodb://localhost:27017/qping-lira'),
+    ConfigModule.forRoot({
+      isGlobal: true, 
+    }),
+    MongooseModule.forRoot(config.get("DB_URL")),
     UsersModule,
     AuthModule,
     ServeStaticModule.forRoot({
@@ -25,16 +32,17 @@ import { EventsModule } from './events/events.module';
     }),
     EmailserviceModule,
     ProfileModule,
-    ChatModule,
-    EventsModule,
+  SeedModule,
+  SettingsModule
   ],
-  controllers: [AppController, ChatController],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_FILTER,
       useClass: ValidationExceptionFilter,
     },
     AppService,
+    SeederService
   ],
 })
 export class AppModule {}
