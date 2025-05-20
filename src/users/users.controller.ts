@@ -41,7 +41,6 @@ export class UserController {
   @Roles('user', 'admin')
   async accountInfoMe(@Request() req: any) {
     let id = req.user.id;
-    console.log(req.user);
     return await this.userService.findOne(id);
   }
   @Patch('me')

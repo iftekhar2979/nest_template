@@ -23,7 +23,6 @@ export class ProfileService {
   async registerProfile(profileDto: ProfileDto): Promise<any> {
 
     const newProfile = await this.createProfile(profileDto) as any;
-    console.log("Proifle==========?",newProfile)
    await this.userModel.findByIdAndUpdate(
       profileDto.userID,
       { profileID: newProfile._id },
@@ -44,63 +43,17 @@ export class ProfileService {
         },
       },
       {
-        $lookup: {
-          from: 'galleries',
-          localField: '_id',
-          foreignField: 'profileID',
-          as: 'gallery',
-        },
-      },
-
-      {
-        $lookup: {
-          from: 'lifestyles',
-          localField: 'userID',
-          foreignField: 'userID',
-          as: 'lifestyle',
-        },
-      },
-
-      {
-        $addFields: {
-          lifestyle: {
-            $arrayElemAt: ['$lifestyle', 0], // Flatten lifestyle array
-          },
-        },
-      },
-      {
         $addFields: {
           age: {
             $dateDiff: {
-              startDate: '$dOB', // Assuming dOB (Date of Birth) field exists
+              startDate: '$dOB', 
               endDate: new Date(),
               unit: 'year',
             },
           },
-          pictures: {
-            $map: {
-              input: '$gallery',
-              as: 'item',
-              in: '$$item.imageURL',
-            },
-          },
         },
       },
-      {
-        $project: {
-          // Exclude fields directly here
-          lifeStyle: 0,
-          createdAt: 0,
-          updatedAt: 0,
-          isDeleted: 0,
-          __v: 0,
-          location: 0,
-          gallery: 0,
-          userID: 0,
-          galleryID: 0,
-          isSubscibed: 0,
-        },
-      },
+    
     ];
     let profile = await this.profileModel.aggregate(query);
     return { message: 'User Retrived Successfully', data: profile[0] };

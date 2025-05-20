@@ -1,58 +1,36 @@
-import { CommunicationStyle, DrinkingFrequency, EducationLevel, ExerciseEnum, PetType, RelationshipPreference, SmokingStatus, SocialMediaActivity } from 'src/lifestyle/lifestyle.schema';
-// import { interestAndValues } from './../dto/lifeStyleAndValues.dto';
-import { Document, Types } from 'mongoose';
-import { CoreValue, Interest } from '../profile.schema';
+import mongoose from "mongoose";
 
-export interface IProfile extends Document {
-  // _id?: Types.ObjectId;
-  userID: Types.ObjectId; // Reference to the User model
-  bio?: string;
-  country: string;
-  profilePictureUrl?: string;
-  languages?: string;
-  dOB?: Date;
-  education?: string;
-  height?: string;
-  gender?: string;
-  subscribedPlanID?: string;
-  lifeStyle?: string[];
-  address?: string;
-  location?: {
-    type: 'Point';
-    coordinates: [number, number]; // Coordinates (longitude, latitude)
-  };
-  age?: number;
-  values?: string[];
-  interest?: string[];
-  galleryID: Types.ObjectId; // Reference to the Gallery model
-  isDeleted?: boolean;
-  isActive?: boolean;
-  isSubscribed?: boolean;
-  isBatchAvailable?: boolean;
-}
-export interface Location{
-    type: 'Point';
-    coordinates: [number, number]; // Coordinates (longitude, latitude)
- 
-}
-export interface userLifeStyle {
-  userID?:Types.ObjectId |string
-  smoking: SmokingStatus;
-  drinking: DrinkingFrequency;
-  sleepSchedule?: string;
-  pets: PetType;
-  execise: ExerciseEnum;
-  education: EducationLevel;
-  communicationStyle: CommunicationStyle;
-  relationshipPreference: RelationshipPreference;
-  socialMedia: SocialMediaActivity;
-  values:CoreValue[]
-  interest: Interest[];
+
+export interface IUserProfile {
+  // 🟢 User fields
+  _id?: mongoose.Schema.Types.ObjectId; // optional if returned from DB
+  fullName: string;
+  userName: string;
+  password: string;
+  email: string;
+  role: 'user' | 'admin';
+  accessPin: string;
+  profileId?: mongoose.Schema.Types.ObjectId | null;
+  isEmailVerified: boolean;
+  image?: string | null;
+  isDeleted: boolean;
 
 }
 
-
-export interface InterestAndValuesAttributes {
-  values: CoreValue[];
-  interest: Interest[];
+export interface IProfile{
+  
+  userId: mongoose.Schema.Types.ObjectId;
+  dOB: Date;
+  height: string;
+  weight: string;
+  weightType: 'kg' | 'g' | 'lb';
+  calorieType: 'cal' | 'kcal';
+  heightType: 'cm' | 'ft' | 'mm' | 'm' | 'in';
+  goal: string;
+  weightGoal: string;
+  caloryGoal: number;
+  protienGoal: number;
+  carbsGoal: number;
+  fatGoal: number;
+  gender: 'male' | 'female';
 }

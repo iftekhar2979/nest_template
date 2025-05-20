@@ -42,92 +42,59 @@ export class AuthService {
     private emailService: EmailService,
   ) {}
   async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userModel.findOne({ name: createUserDto.name });
+    return await this.userModel.findOne({ fullName : createUserDto.fullName });
   }
   async checkUserExistWiththeEmail(
     createUserDto: CreateUserDto,
   ): Promise<User> {
     return await this.userModel.findOne({ email: createUserDto.email });
   }
-  async checkUserExistWithPhone(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userModel.findOne({ phone: createUserDto.phone });
-  }
+
   async create(createUserDto: CreateUserDto): Promise<any> {
-    console.log("createUserDto===>",createUserDto);
-    
-    // Check if the user already exists
-    // console.time('STARTED');
-    // console.time('userExistCheck===============');
     const existingUser = await this.userModel.findOne({
       $or: [
-        { name: createUserDto.name },
-        { email: createUserDto.email },
-        { phone: createUserDto.phone },
+        { fullName : createUserDto.fullName },
+        { email: createUserDto.email }
       ],
     });
-    // console.timeEnd('userExistCheck');
-    console.log("===========",existingUser);
-    console.log("===========",createUserDto);
-    
     if (existingUser) {
-      if (existingUser.name === createUserDto.name) {
-        console.log('User with this name already exists!=======');
-        
+      if (existingUser.fullName === createUserDto.fullName) {
         throw new BadRequestException('User with this name already exists!');
       }
       if (existingUser.email === createUserDto.email) {
         throw new BadRequestException('User with this Email already exists!');
       }
-      if (existingUser.phone === createUserDto.phone) {
-        throw new BadRequestException(
-          'User with this Phone Number already exists!',
-        );
-      }
+     
     }
-    // Create the user
     const newUser = new this.userModel({ ...createUserDto });
     let otp = generateOtp();
     const currentDate = new Date();
-    currentDate.setMinutes(currentDate.getMinutes() + 3); // OTP expiration time (3 minutes from now)
-
-    // Create OTP document
+    currentDate.setMinutes(currentDate.getMinutes() + 3); 
     const saveOtp = new this.otpModel({
       oneTimePassword: otp,
       userID: newUser._id,
       expiredAt: currentDate,
     });
-    // Send OTP email
-    console.time('Email Service');
     this.emailService
-      .sendOtpEmail(newUser.email, otp, newUser.name)
+      .sendOtpEmail(newUser.email, otp, newUser.fullName)
       .then(() => {
         console.log(`OTP email sent to ${newUser.email}`);
       })
       .catch((error) => {
         console.error('Error sending OTP email:', error);
       });
-    console.timeEnd('Email Service');
-    // Prepare JWT payload
     const payload = {
       email: newUser.email,
       id: newUser._id,
       role: newUser.role,
-      name: newUser.name,
+      name: newUser.fullName,
     };
-    // Sign the JWT token
     const token = this.jwtService.sign(payload);
-    console.time('Save User');
     let savedUser = await newUser.save();
-    console.timeEnd('Save User');
-    // Save the user, OTP, and profile information
     savedUser.password = undefined;
     savedUser.isEmailVerified = undefined;
     savedUser.isDeleted = undefined;
-    console.time('Save OTP');
     await saveOtp.save();
-    // console.timeEnd('Save OTP');
-    // console.timeEnd('STARTED');
-    // Return the saved user and JWT token
     return {
       message:
         'Please Check Your Email and Verify you email to get full access',
@@ -150,8 +117,6 @@ export class AuthService {
   }
 
   async find(authDto) {
-    console.log(authDto);
-    
     let user = await this.userModel.findOne({ email: authDto.email });
     if (!user) {
       throw new BadRequestException('User not Found!');
@@ -185,7 +150,7 @@ export class AuthService {
       await this.emailService.sendOtpEmail(
         user.email,
         generateOtpModel.oneTimePassword,
-        user.name,
+        user.fullName,
       );
       generateOtpModel.save();
 
@@ -207,7 +172,7 @@ export class AuthService {
       email: user.email,
       id: user._id,
       role: user.role,
-      name: user.name,
+      name: user.fullName,
       tokenFor: 'auth',
     };
     const token = this.jwtService.sign(payload);
@@ -360,7 +325,7 @@ export class AuthService {
       });
 
       this.emailService
-        .sendOtpEmail(user.email, otp, user.name)
+        .sendOtpEmail(user.email, otp, user.fullName)
         .then((res) => {
           console.log(res);
         })

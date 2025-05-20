@@ -1,4 +1,4 @@
-import { Pagination } from "./pagination.interface";
+
 
 export function pagination(limit: number, page: number, total: number){
     // console.log(page,"from pagination")

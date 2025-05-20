@@ -1,34 +1,45 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
-import * as bcrypt from 'bcryptjs'; // Import bcryptjs
 import * as argon2 from 'argon2';
+export enum RoleType {
+  ADMIN = 'admin' ,
+  USER = 'user'
+}
 
 // Define the User schema using the Schema decorator
 @Schema({ timestamps: true })
 export class User extends Document {
-  @Prop({ required: true, trim: true })
-  name: string;
-
-  @Prop({ required: true })
+  @Prop({ required: true, trim: true, minlength: 3, maxlength: 30 })
+  fullName: string;
+  @Prop({
+    required: true,
+    trim: true,
+    unique: true,
+    minlength: 6,
+    maxlength: 20,
+  })
+  userName: string;
+  @Prop({ required: true, trim: true, minlength: 6, maxlength: 20 })
   password: string;
-
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({
+    required: true,
+    unique: true,
+    trim: true,
+    minlength: 10,
+    maxlength: 60,
+  })
   email: string;
-
-  @Prop({ required: true, unique: true })
-  phone: string;
-
-  @Prop({ enum: ['user', 'admin'], default: 'user' })
-  role: 'user' | 'admin';
-
+  @Prop({ enum: RoleType, default: RoleType.USER })
+  role: RoleType;
+  @Prop({ required:false, minlength: 6, maxlength: 10 })
+  accessPin: string;
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Profile', default: null })
-  profileID: mongoose.Schema.Types.ObjectId | null;
-
-  @Prop({ default: false })
+  profileId: mongoose.Schema.Types.ObjectId | null;
+  @Prop({ default: true })
   isEmailVerified: boolean;
-  @Prop({ required: false, default: null })
-  profilePicture: string | null;
+  @Prop({ required: false, default: '' })
+  image: string | null;
   @Prop({ default: false })
   isDeleted: boolean;
 }
@@ -39,19 +50,14 @@ export const UserSchema = SchemaFactory.createForClass(User);
 // Pre-save hook to hash the password before saving
 UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
-    console.time('Password Hashed');
-
     try {
-      // Hash the password using Argon2
       this.password = await argon2.hash(this.password);
-      console.timeEnd('Password Hashed');
     } catch (error) {
       console.error('Error hashing password:', error);
-      next(error); // If hashing fails, propagate the error
+      next(error);
     }
   }
   next();
 });
 
-//  UserSchema.index({  }); // Create a compound index on email and phone
-UserSchema.index({ name: 'text', phone: 'text' });
+UserSchema.index({ fullName: 'text', userName: 'text' });

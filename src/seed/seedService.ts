@@ -14,8 +14,7 @@ export class SeederService {
   constructor(
     private readonly userService: UserService,
     private readonly settingService: SettingsService,
-    private readonly configService: ConfigService
-    // @InjectModel(Settings.name) private settingModel: Model<Settings>,
+    private readonly configService: ConfigService,
   ) {}
 
   async seedAdminUser() {
@@ -26,22 +25,24 @@ export class SeederService {
       const adminDto : {
         email:string,
         password:string,
+        userName:string,
         role:string,
-        name:string,
-        profilePicture:string,
+        fullName:string,
+        image:string,
         phone:string,
         isEmailVerified:boolean
       } = {
         email: adminEmail,
-        password: this.configService.get<string>('ADMIN_PASSWORD'), // Set your preferred password or generate one
-        role: this.configService.get<string>('ADMIN_ROLE'), // Adjust if you have roles set up
-        name: this.configService.get<string>('ADMIN_NAME'),
-        profilePicture: this.configService.get<string>('ADMIN_PROFILE_PICTURE'),
+        userName:'untold_secret',
+        password: this.configService.get<string>('ADMIN_PASSWORD'), 
+        role: this.configService.get<string>('ADMIN_ROLE'), 
+        fullName: this.configService.get<string>('ADMIN_NAME'),
+        image: this.configService.get<string>('ADMIN_PROFILE_PICTURE'),
         phone: this.configService.get<string>('ADMIN_PHONE'),
         isEmailVerified: true,
       };
 
-      await this.userService.create(adminDto);
+      await this.userService.createUser(adminDto);
 
       // await this.userService.create(adminDto);
       console.log('Admin created successfully!');

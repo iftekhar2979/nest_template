@@ -1,50 +1,43 @@
-// src/user/user.service.ts
 import {
-  HttpException,
-  HttpStatus,
   Injectable,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import mongoose, { Model, mongo } from 'mongoose';
+import  { Model,  } from 'mongoose';
 import { User } from './users.schema';
-import { IUser } from './users.interface';
 import { pagination } from 'src/common/pagination/pagination';
-import { Pagination } from 'src/common/pagination/pagination.interface';
-import { parse } from 'path';
+import { IPagination } from 'src/common/pagination/pagination.interface';
 import { CreateUserDto } from './dto/createUser.dto';
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
-  // Create a new user
-
   async create(createUserDto: CreateUserDto): Promise<User> {
     const newUser = new this.userModel(createUserDto);
+    return newUser.save();
+  }
+  async createUser(user): Promise<User> {
+    const newUser = new this.userModel(user);
     return newUser.save();
   }
   async updateProfilePicture(id: string, url: string): Promise<User> {
     return this.userModel.findByIdAndUpdate(
       id,
-      { profilePicture: url },
+      { image: url },
       { new: true },
     );
   }
   async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userModel.findOne({ name: createUserDto.name });
+    return await this.userModel.findOne({ name: createUserDto.fullName });
   }
   async checkUserExistWiththeEmail(
     createUserDto: CreateUserDto,
   ): Promise<User> {
     return await this.userModel.findOne({ email: createUserDto.email });
   }
-  // Get all users
-
   async findAll(query: {
     term: string;
     page: string;
     limit: string;
-  }): Promise<{ data: User[]; pagination: Pagination }> {
+  }): Promise<{ data: User[]; pagination: IPagination }> {
     let page = parseFloat(query.page);
     let limit = parseFloat(query.limit);
     const skip = (page - 1) * limit;
