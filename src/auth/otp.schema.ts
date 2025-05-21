@@ -16,5 +16,8 @@ export class Otp extends Document {
   expiredAt: Date;
   @Prop({ default: 0 })
   attempts: number;
+  
 }
 export const OtpSchema = SchemaFactory.createForClass(Otp);
+
+OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3000 });

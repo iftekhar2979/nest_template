@@ -25,8 +25,11 @@ export class JwtAuthGuard {
     }
 
     try {
+      console.log(token)
       const payload = await this.jwtService.verifyAsync(token);
+      console.log(payload)
       const user = await this.userService.findOne(payload.id);
+     console.log(user)
       if (!user) {
         throw new BadRequestException('User is Not Available!');
       }
@@ -42,6 +45,7 @@ export class JwtAuthGuard {
       request.user = payload; // Attach user data to the request
       return true;
     } catch (error) {
+      console.log(error)
       throw new UnauthorizedException(
         'You are not authorized to access this resource!',
       );

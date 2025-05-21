@@ -19,8 +19,6 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
   @Post('register')
   async create(@Body() createUserDto: CreateUserDto) {
-    console.log("==========",createUserDto);
-    
     return this.authService.create(createUserDto);
   }
   @Post('login')
@@ -32,6 +30,7 @@ export class AuthController {
   VerifyOtp(@Request() req, @Body() body: { code: string }) {
     const user = req.user; // Access user data from JWT
     const code = body.code;
+    
     return this.authService.verifyOtp(user, code);
   }
   @Post('otp/resend')

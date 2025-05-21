@@ -7,6 +7,7 @@ import { authDto } from './dto/auth.dto';
 import {
   BadGatewayException,
   BadRequestException,
+  ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
@@ -179,6 +180,12 @@ export class AuthService {
     return { message: 'Logged In Successfully', data: user, token };
   }
   async verifyOtp(user: Omit<IUser, 'password'>, code: string) {
+    if(!code){
+      throw new BadRequestException("Please put your verification code")
+    }
+    if(code.length !== 6){
+      throw new BadRequestException("Verification code is not valid")
+    }
     let otpValue = await this.otpModel.findOne({ userID: user.id });
     if(!otpValue){
       throw new BadRequestException({
@@ -265,16 +272,20 @@ export class AuthService {
 
     return { message: 'OTP sent successfully', data: {} };
   }
-  async resetPassword(user: Partial<IUser>, resetPasswordDto) {
+  async resetPassword(user: Partial<IUser>, resetPasswordDto:resetPasswordDto) {
     let id = user.id;
     let userInfo = await this.userModel.findById(id).select('password');
     if (!userInfo) {
       throw new NotFoundException('User not Found!');
     }
-    let isMatch = await comparePassword(
+ if(resetPasswordDto.oldPassword === resetPasswordDto.newPassword){
+  throw new BadRequestException("New Password should not same as old one!")
+ }
+    let isMatch = await comparePasswordWithArgon(
       resetPasswordDto.oldPassword,
       userInfo.password,
     );
+    console.log(isMatch)
     if (!isMatch) {
       throw new BadRequestException('Password Not Matched!');
     }

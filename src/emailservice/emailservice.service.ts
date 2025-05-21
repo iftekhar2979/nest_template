@@ -9,7 +9,7 @@ export class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      service: 'gmail', // Or your chosen email service provider
+      service: 'gmail', 
       auth: {
         user: configService.get<string>('SMTP_USERNAME'), 
         pass: configService.get<string>('SMTP_PASSWORD'), 
@@ -45,7 +45,6 @@ export class EmailService {
       <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Untold Secret - OTP for Registration</title>
           <style>
               body {
                   font-family: Arial, sans-serif;
