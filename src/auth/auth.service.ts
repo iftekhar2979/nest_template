@@ -1,5 +1,4 @@
 import { UserService } from 'src/users/users.service';
-import { IProfile } from './../profile/interface/profile.interface';
 import { resetPasswordDto, forgetPasswordDto } from './dto/auth.dto';
 // import { EmailService } from './../common/mailer/sendMail';
 import { JwtService } from '@nestjs/jwt';
@@ -31,19 +30,17 @@ import { Otp } from './otp.schema';
 import { EmailService } from 'src/emailservice/emailservice.service';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
 import { otp } from './interface/otp.inteface';
-import { Profile } from 'src/profile/profile.schema';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(Otp.name) private otpModel: Model<Otp>,
     @InjectModel(User.name) private userModel: Model<User>, // Injecting the User model
-    @InjectModel(Profile.name) private profileModel: Model<IProfile>,
     private jwtService: JwtService, // Injecting the JwtService for token generation
     private emailService: EmailService,
-  ) {}
+  ) { }
   async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userModel.findOne({ fullName : createUserDto.fullName });
+    return await this.userModel.findOne({ fullName: createUserDto.fullName });
   }
   async checkUserExistWiththeEmail(
     createUserDto: CreateUserDto,
@@ -54,7 +51,7 @@ export class AuthService {
   async create(createUserDto: CreateUserDto): Promise<any> {
     const existingUser = await this.userModel.findOne({
       $or: [
-        { fullName : createUserDto.fullName },
+        { fullName: createUserDto.fullName },
         { email: createUserDto.email }
       ],
     });
@@ -65,12 +62,12 @@ export class AuthService {
       if (existingUser.email === createUserDto.email) {
         throw new BadRequestException('User with this Email already exists!');
       }
-     
+
     }
     const newUser = new this.userModel({ ...createUserDto });
     let otp = generateOtp();
     const currentDate = new Date();
-    currentDate.setMinutes(currentDate.getMinutes() + 3); 
+    currentDate.setMinutes(currentDate.getMinutes() + 3);
     const saveOtp = new this.otpModel({
       oneTimePassword: otp,
       userID: newUser._id,
@@ -180,14 +177,14 @@ export class AuthService {
     return { message: 'Logged In Successfully', data: user, token };
   }
   async verifyOtp(user: Omit<IUser, 'password'>, code: string) {
-    if(!code){
+    if (!code) {
       throw new BadRequestException("Please put your verification code")
     }
-    if(code.length !== 6){
+    if (code.length !== 6) {
       throw new BadRequestException("Verification code is not valid")
     }
     let otpValue = await this.otpModel.findOne({ userID: user.id });
-    if(!otpValue){
+    if (!otpValue) {
       throw new BadRequestException({
         message:
           'OTP has been expired!',
@@ -220,7 +217,7 @@ export class AuthService {
         role: user.role,
         tokenFor: 'forget-password',
       };
-    }else{
+    } else {
       payload = {
         email: user.email,
         id: user.id,
@@ -229,13 +226,13 @@ export class AuthService {
         tokenFor: 'email-verification',
       };
     }
-  
+
     const token = this.jwtService.sign(payload);
     return { message: 'OTP Verified Successfully', data: {}, token };
   }
   async resendOtp(user: Omit<IUser, 'password'>) {
     // Retrieve the last OTP entry for the user
-    console.log("user",user)
+    console.log("user", user)
     let otpData: otp = await this.otpModel.findOne({ userID: user.id });
     // If OTP data exists, check the time difference
     if (otpData && otpData.updatedAt) {
@@ -272,15 +269,15 @@ export class AuthService {
 
     return { message: 'OTP sent successfully', data: {} };
   }
-  async resetPassword(user: Partial<IUser>, resetPasswordDto:resetPasswordDto) {
+  async resetPassword(user: Partial<IUser>, resetPasswordDto: resetPasswordDto) {
     let id = user.id;
     let userInfo = await this.userModel.findById(id).select('password');
     if (!userInfo) {
       throw new NotFoundException('User not Found!');
     }
- if(resetPasswordDto.oldPassword === resetPasswordDto.newPassword){
-  throw new BadRequestException("New Password should not same as old one!")
- }
+    if (resetPasswordDto.oldPassword === resetPasswordDto.newPassword) {
+      throw new BadRequestException("New Password should not same as old one!")
+    }
     let isMatch = await comparePasswordWithArgon(
       resetPasswordDto.oldPassword,
       userInfo.password,
@@ -347,7 +344,7 @@ export class AuthService {
       await saveOtp.save();
       let payload = {
         id: user.id,
-        email:user.email,
+        email: user.email,
         role: user.role,
         tokenFor: 'forget-password',
       };

@@ -27,7 +27,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { multerConfig, multerS3Config } from 'src/common/multer/multer.config';
+import { multerConfig } from 'src/common/multer/multer.config';
 
 // import { PinService } from 'src/pin/pin.service';
 
@@ -35,7 +35,7 @@ import { multerConfig, multerS3Config } from 'src/common/multer/multer.config';
 export class UserController {
   constructor(
     private readonly userService: UserService,
-  ) {}
+  ) { }
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user', 'admin')
@@ -58,7 +58,7 @@ export class UserController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-   findAll(@Query() query: { limit: number; page: number ,term:string}) {
+  findAll(@Query() query: { limit: number; page: number, term: string }) {
     try {
       return this.userService.findAll({
         ...query,
@@ -72,21 +72,21 @@ export class UserController {
   @Get('/count')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-   countDocument() {
-      return this.userService.count();
-  
+  countDocument() {
+    return this.userService.count();
+
   }
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
-   findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('user')
-   update(@Param('id') id: string, @Body() updateUserDto: any) {
+  update(@Param('id') id: string, @Body() updateUserDto: any) {
     return this.userService.update(id, updateUserDto);
   }
   @Delete(':id')
@@ -96,21 +96,21 @@ export class UserController {
     return this.userService.delete(id);
   }
 
-  @Post('profile-picture')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user','admin')
-  @UseInterceptors(FileInterceptor('file', {storage:multerS3Config}))
-  imagesUpload(@Request() req, @UploadedFile() file: Express.Multer.File) {
-    let user = req.user; // Assuming user info is in the request
-    console.log(file)
-    return this.userService.uploadProfilePicture(user, file);
-  }
+  // @Post('profile-picture')
+  // @UseGuards(JwtAuthGuard, RolesGuard)
+  // @Roles('user', 'admin')
+  // @UseInterceptors(FileInterceptor('file', { storage: multerS3Config }))
+  // imagesUpload(@Request() req, @UploadedFile() file: Express.Multer.File) {
+  //   let user = req.user; // Assuming user info is in the request
+  //   console.log(file)
+  //   return this.userService.uploadProfilePicture(user, file);
+  // }
 
   @Patch('/info/me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   async updateAccountInformation(
     @Request() req,
-    @Body() info: { name?: string ,email?:string},
+    @Body() info: { name?: string, email?: string },
   ) {
     return this.userService.update(req.user.id, info);
   }

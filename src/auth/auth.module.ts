@@ -11,7 +11,6 @@ import { Otp, OtpSchema } from './otp.schema';
 // import { EmailService } from 'src/common/mailer/sendMail';
 import { EmailserviceModule } from 'src/emailservice/emailservice.module';
 import { Reflector } from '@nestjs/core';
-import { Profile, ProfileSchema } from 'src/profile/profile.schema';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 
@@ -19,16 +18,15 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     MongooseModule.forFeature([{ name: Otp.name, schema: OtpSchema }]),
-    MongooseModule.forFeature([{ name: Profile.name, schema: ProfileSchema }]),
 
-     JwtModule.registerAsync({
-            imports: [ConfigModule],
-            useFactory: async (configService: ConfigService) => ({
-              secret: configService.get<string>('JWT_SECRET'),
-              signOptions: { expiresIn: '30d' },
-            }),
-            inject: [ConfigService],
-          }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '30d' },
+      }),
+      inject: [ConfigService],
+    }),
     UsersModule,
     EmailserviceModule,
     Reflector,  // Register Reflector for metadata reflection
@@ -36,4 +34,4 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
   providers: [AuthService],
   controllers: [AuthController],
 })
-export class AuthModule {}
+export class AuthModule { }
