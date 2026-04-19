@@ -2,63 +2,91 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import * as mongoose from 'mongoose';
 import * as argon2 from 'argon2';
 import { Base } from '../../common/schema/base.schema';
+
 export enum RoleType {
-  ADMIN = 'admin' ,
-  USER = 'user'
+  ADMIN = 'admin',
+  USER = 'user',
 }
 
-// Define the User schema using the Schema decorator
 @Schema()
 export class User extends Base {
-  @Prop({ required: true, trim: true, minlength: 3, maxlength: 30 })
-  fullName: string;
-  @Prop({
-    required: true,
-    trim: true,
-    unique: true,
-    minlength: 6,
-    maxlength: 20,
-  })
-  userName: string;
-  @Prop({ required: true, trim: true, minlength: 6, maxlength: 20 })
-  password: string;
-  @Prop({
-    required: true,
-    unique: true,
-    trim: true,
-    minlength: 10,
-    maxlength: 60,
-  })
+  @Prop({ required: true, unique: true, trim: true, lowercase: true })
   email: string;
+
+  @Prop({ required: true, select: false })
+  password: string;
+
+  @Prop({ required: false })
+  phoneNumber: string;
+
+  @Prop({ required: true, trim: true })
+  fullName: string;
+
+  @Prop({ required: false, default: '' })
+  avatarUrl: string;
+
+  @Prop({ required: false })
+  dateOfBirth: Date;
+
+  @Prop({ required: false })
+  gender: string;
+
+  @Prop({ required: false })
+  employment: string;
+
+  @Prop({ required: false })
+  education: string;
+
+  @Prop({ required: false })
+  university: string;
+
+  @Prop({ required: false })
+  linkedinUrl: string;
+
+  @Prop({ default: 0 })
+  totalScore: number;
+
+  @Prop({ default: false })
+  isEmailVerified: boolean;
+
+  @Prop({ default: false })
+  isTcPpAccepted: boolean;
+
+  @Prop({ default: null })
+  emailVerifiedAt: Date;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'SubscriptionPlan', default: null })
+  activePlanId: mongoose.Schema.Types.ObjectId;
+
+  @Prop({ required: false })
+  subscriptionStatus: string; // active | expired | cancelled | trialing
+
+  @Prop({ default: null })
+  accessExpiresAt: Date;
+
   @Prop({ enum: RoleType, default: RoleType.USER })
   role: RoleType;
-  @Prop({ required:false, minlength: 6, maxlength: 10 })
+
+  @Prop({ default: null })
+  lastLoginAt: Date;
+
+  @Prop({ select: false })
   accessPin: string;
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Profile', default: null })
-  profileId: mongoose.Schema.Types.ObjectId | null;
-  @Prop({ default: true })
-  isEmailVerified: boolean;
-  @Prop({ required: false, default: '' })
-  image: string | null;
 }
 
-// Create the schema and apply pre-save hook outside the class
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Apply production-ready query hooks
 User.applyBaseHooks(UserSchema);
 
-// Pre-save hook to hash the password before saving
 UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
     try {
       this.password = await argon2.hash(this.password);
     } catch (error) {
-      console.error('Error hashing password:', error);
       next(error);
     }
   }
   next();
 });
 
-UserSchema.index({ fullName: 'text', userName: 'text' });
+UserSchema.index({ fullName: 'text', email: 'text' });
