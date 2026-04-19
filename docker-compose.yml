@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # --- MongoDB Database ---
+  mongodb:
+    image: mongo:latest
+    container_name: quiz_app_mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - quiz_network
+
+  # --- Redis Cache & BullMQ ---
+  redis:
+    image: redis:alpine
+    container_name: quiz_app_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - quiz_network
+
+  # --- MinIO S3-Compatible Storage ---
+  minio:
+    image: minio/minio:latest
+    container_name: quiz_app_minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - quiz_network
+
+  # --- NestJS Application ---
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quiz_app_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - DB_URL=mongodb://mongodb:27017/nest_template
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - JWT_SECRET=${JWT_SECRET:-fallback_secret_for_dev_only}
+      - EXPIRES_IN=30d
+      - STAGE=production
+      # Admin seeding (optional, can be passed via .env)
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-AdminPassword123!}
+      - ADMIN_ROLE=admin
+      - ADMIN_NAME=Super Admin
+    depends_on:
+      - mongodb
+      - redis
+      - minio
+    networks:
+      - quiz_network
+
+networks:
+  quiz_network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
