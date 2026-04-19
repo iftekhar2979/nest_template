@@ -2,14 +2,14 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import  { Model,  } from 'mongoose';
-import { User } from './users.schema';
+import { Model, } from 'mongoose';
+import { User } from './schema/users.schema';
 import { pagination } from 'src/common/pagination/pagination';
 import { IPagination } from 'src/common/pagination/pagination.interface';
 import { CreateUserDto } from './dto/createUser.dto';
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
   async create(createUserDto: CreateUserDto): Promise<User> {
     const newUser = new this.userModel(createUserDto);
     return newUser.save();
@@ -43,15 +43,15 @@ export class UserService {
     const skip = (page - 1) * limit;
     const data = await this.userModel
       .find({
-      $or: [
-        { name: { $regex: new RegExp(query.term, 'i') } },
-        { email: { $regex: new RegExp(query.term, 'i') } },
-      ],
-      isDeleted:false,
-      role: 'user',
+        $or: [
+          { name: { $regex: new RegExp(query.term, 'i') } },
+          { email: { $regex: new RegExp(query.term, 'i') } },
+        ],
+        isDeleted: false,
+        role: 'user',
       })
       .select('-password')
-      .sort({createdAt:-1})
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .exec();
@@ -61,9 +61,9 @@ export class UserService {
           { name: { $regex: new RegExp(query.term, 'i') } },
           { email: { $regex: new RegExp(query.term, 'i') } },
         ],
-        isDeleted:false,
+        isDeleted: false,
         role: 'user',
-        })
+      })
       .exec();
     return { data, pagination: pagination(limit, page, total) };
   }

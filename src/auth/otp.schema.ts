@@ -1,8 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose, { Document } from 'mongoose';
+import mongoose from 'mongoose';
+import { Base } from '../common/schema/base.schema';
 
-@Schema({ timestamps: true })
-export class Otp extends Document {
+@Schema()
+export class Otp extends Base {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Profile',
@@ -19,5 +20,8 @@ export class Otp extends Document {
   
 }
 export const OtpSchema = SchemaFactory.createForClass(Otp);
+
+// Apply production-ready query hooks
+Otp.applyBaseHooks(OtpSchema);
 
 OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3000 });

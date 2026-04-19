@@ -12,7 +12,7 @@ export class JwtAuthGuard {
   constructor(
     private readonly jwtService: JwtService, // Inject JwtService
     private readonly userService: UserService, // Inject UserService
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
@@ -29,7 +29,7 @@ export class JwtAuthGuard {
       const payload = await this.jwtService.verifyAsync(token);
       console.log(payload)
       const user = await this.userService.findOne(payload.id);
-     console.log(user)
+      console.log(user)
       if (!user) {
         throw new BadRequestException('User is Not Available!');
       }
@@ -38,9 +38,7 @@ export class JwtAuthGuard {
           'You are not authorized to access this resource!',
         );
       }
-      if (user.isDeleted) {
-        throw new BadRequestException('User is Not Available!');
-      }
+
 
       request.user = payload; // Attach user data to the request
       return true;

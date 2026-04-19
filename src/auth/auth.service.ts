@@ -21,7 +21,7 @@ import {
   comparePasswordWithArgon,
   hashPassword,
 } from 'src/common/bycrypt/bycrypt';
-import { User } from 'src/users/users.schema';
+import { User } from 'src/users/schema/users.schema';
 import { profile, error } from 'console';
 import { IUser } from 'src/users/users.interface';
 import { CreateUserDto } from 'src/users/dto/createUser.dto';
@@ -91,7 +91,6 @@ export class AuthService {
     let savedUser = await newUser.save();
     savedUser.password = undefined;
     savedUser.isEmailVerified = undefined;
-    savedUser.isDeleted = undefined;
     await saveOtp.save();
     return {
       message:

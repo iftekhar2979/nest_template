@@ -1,15 +1,15 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import * as argon2 from 'argon2';
+import { Base } from '../../common/schema/base.schema';
 export enum RoleType {
   ADMIN = 'admin' ,
   USER = 'user'
 }
 
 // Define the User schema using the Schema decorator
-@Schema({ timestamps: true })
-export class User extends Document {
+@Schema()
+export class User extends Base {
   @Prop({ required: true, trim: true, minlength: 3, maxlength: 30 })
   fullName: string;
   @Prop({
@@ -40,12 +40,13 @@ export class User extends Document {
   isEmailVerified: boolean;
   @Prop({ required: false, default: '' })
   image: string | null;
-  @Prop({ default: false })
-  isDeleted: boolean;
 }
 
 // Create the schema and apply pre-save hook outside the class
 export const UserSchema = SchemaFactory.createForClass(User);
+
+// Apply production-ready query hooks
+User.applyBaseHooks(UserSchema);
 
 // Pre-save hook to hash the password before saving
 UserSchema.pre('save', async function (next) {

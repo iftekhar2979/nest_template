@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { User } from './users.schema';
+import { User } from './schema/users.schema';
 import { UserService } from './users.service';
 import { CreateUserDto } from './dto/createUser.dto';
 
