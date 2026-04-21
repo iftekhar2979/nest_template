@@ -44,6 +44,7 @@ import { BullModule } from '@nestjs/bullmq';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
       validationSchema: envSchema,
     }),
     WinstonModule.forRoot(winstonLoggerConfig),
