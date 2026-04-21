@@ -1,58 +1,73 @@
-import { error } from 'console';
-import { UserService } from 'src/users/users.service';
 import {
   Body,
   Controller,
   Post,
-  ExceptionFilter,
-  Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { authDto, forgetPasswordDto, resetPasswordDto } from './dto/auth.dto';
-import { CreateUserDto } from 'src/users/dto/createUser.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  VerifyOtpDto,
+  RefreshTokenDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
   @Post('register')
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.authService.create(createUserDto);
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
+
+  @Post('verify-email')
+  @UseGuards(JwtAuthGuard)
+  async verifyEmail(@Request() req, @Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyEmail(req.user.sub, verifyOtpDto);
+  }
+
   @Post('login')
-  async login(@Body() authDto: authDto) {
-    return this.authService.find(authDto);
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
-  @Post('otp/verify')
+
+  @Post('refresh-token')
+  @HttpCode(HttpStatus.OK)
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshToken(refreshTokenDto);
+  }
+
+  @Post('logout')
   @UseGuards(JwtAuthGuard)
-  VerifyOtp(@Request() req, @Body() body: { code: string }) {
-    const user = req.user; // Access user data from JWT
-    const code = body.code;
-    
-    return this.authService.verifyOtp(user, code);
+  @HttpCode(HttpStatus.OK)
+  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.logout(refreshTokenDto.refreshToken);
   }
-  @Post('otp/resend')
+
+  @Post('logout-all')
   @UseGuards(JwtAuthGuard)
-  resendOtp(@Request() req) {
-    const user = req.user; // Access user data from JWT
-    return this.authService.resendOtp(user);
+  @HttpCode(HttpStatus.OK)
+  async logoutAll(@Request() req) {
+    return this.authService.logoutAll(req.user.sub);
   }
-  @Post('otp/send-for-forgot-password')
-  resendOtpForForget(@Request() req, @Body('email') email: string) {
-    return this.authService.resendOtpForForget(email);
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto);
   }
-  @Post('password/reset')
-  @UseGuards(JwtAuthGuard)
-  resetPassword(@Request() req, @Body() resetPasswordDto: resetPasswordDto) {
-    const user = req.user; // Access user data from JWT
-    return this.authService.resetPassword(user, resetPasswordDto);
-  }
-  @Post('password/forgot')
-  @UseGuards(JwtAuthGuard)
-  forgetPassword(@Request() req, @Body() forgetPasswordDto:forgetPasswordDto) {
-    const user = req.user; 
-    return this.authService.forgetPassword(user, forgetPasswordDto);
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 }

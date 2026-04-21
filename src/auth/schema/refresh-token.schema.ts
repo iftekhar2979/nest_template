@@ -4,14 +4,15 @@ import { Base } from '../../common/schema/base.schema';
 
 @Schema()
 export class RefreshToken extends Base {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  })
   userId: mongoose.Schema.Types.ObjectId;
 
   @Prop({ required: true, unique: true })
-  tokenHash: string;
-
-  @Prop({ required: false })
-  deviceName: string;
+  token: string; // Hashed refresh token
 
   @Prop({ required: true })
   expiresAt: Date;
@@ -23,5 +24,3 @@ export class RefreshToken extends Base {
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
 
 RefreshToken.applyBaseHooks(RefreshTokenSchema);
-
-RefreshTokenSchema.index({ tokenHash: 1 });

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Query } from 'mongoose';
-import { ParsedQueryOptions } from './decorators/parsed-query.decorator';
+
 
 @Injectable()
 export class QueryHandlerService {
@@ -13,7 +13,7 @@ export class QueryHandlerService {
    */
   apply<T, Doc>(
     query: Query<T, Doc>,
-    parsedOptions: ParsedQueryOptions,
+    parsedOptions,
   ): Query<T, Doc> {
     const { filter, sort, projection, options } = parsedOptions;
 

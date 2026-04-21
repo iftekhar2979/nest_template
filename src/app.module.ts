@@ -38,6 +38,7 @@ import { RefreshTokensModule } from './refresh_tokens/refresh_tokens.module';
 import { UserBadgesService } from './user_badges/user_badges.service';
 import { UserBadgesModule } from './user_badges/user_badges.module';
 import * as mongoose from 'mongoose';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -78,7 +79,17 @@ import * as mongoose from 'mongoose';
     UserSubscriptionsModule,
     EmailVerificationTokensModule,
     RefreshTokensModule,
-    UserBadgesModule
+    UserBadgesModule,
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST'),
+          port: configService.get<number>('REDIS_PORT'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
   ],
   controllers: [AppController, BadgesController, UserSubscriptionsController],
   providers: [
