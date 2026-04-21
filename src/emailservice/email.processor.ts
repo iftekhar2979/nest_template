@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { EmailService } from './emailservice.service';
+import { EMAIL_CONSTANTS } from './constants/email.constants';
 
 @Processor('EMAIL_QUEUE')
 export class EmailProcessor extends WorkerHost {
@@ -12,7 +13,7 @@ export class EmailProcessor extends WorkerHost {
     const { email, otp, fullName, type } = job.data;
 
     switch (job.name) {
-      case 'sendOtp':
+      case EMAIL_CONSTANTS.SEND_OTP:
         await this.emailService.sendOtpEmail(email, otp, fullName);
         break;
       // Add more cases as needed (e.g., welcome email, reset password success)

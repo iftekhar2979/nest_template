@@ -9,10 +9,10 @@ export class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      service: 'gmail', 
+      service: 'gmail',
       auth: {
-        user: configService.get<string>('SMTP_USERNAME'), 
-        pass: configService.get<string>('SMTP_PASSWORD'), 
+        user: configService.get<string>('SMTP_USER'),
+        pass: configService.get<string>('SMTP_PASS'),
       },
     });
   }
@@ -23,7 +23,7 @@ export class EmailService {
     const htmlTemplate = this.getOtpHtmlTemplate(userName, otp);
 
     const mailOptions = {
-      from: process.env.SMTP_USERNAME,
+      from: process.env.SMTP_USER,
       to,
       subject: 'Untold Secret OTP for Registration',
       html: htmlTemplate,

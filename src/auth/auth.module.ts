@@ -27,7 +27,7 @@ import { JwtStrategy } from './guard/jwt.strategy';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' }, // Default access token expiry
+        signOptions: { expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRY') }, // Default access token expiry
       }),
       inject: [ConfigService],
     }),
@@ -44,4 +44,4 @@ import { JwtStrategy } from './guard/jwt.strategy';
   controllers: [AuthController],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }

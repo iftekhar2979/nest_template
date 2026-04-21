@@ -62,7 +62,7 @@ export class AuthService {
     });
 
     // Push to BullMQ
-    await this.emailQueue.add('sendOtp', {
+    await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
       email: newUser.email,
       otp: otpCode,
       fullName: newUser.fullName,
@@ -129,7 +129,7 @@ export class AuthService {
       });
 
       // Push email task to BullMQ
-      await this.emailQueue.add('sendOtp', {
+      await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
         email: user.email,
         otp: otpCode,
         fullName: user.fullName,
@@ -197,7 +197,7 @@ export class AuthService {
       expiredAt: expiryDate,
     });
 
-    await this.emailQueue.add('sendOtp', {
+    await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
       email: user.email,
       otp: otpCode,
       fullName: user.fullName,
