@@ -86,8 +86,7 @@ async function bootstrap() {
   // );
   // app.use(cookieParser());
   // app.use(compression());
-  // await seederService.seedData();
-  // await seederService.seedAdminUser();
+  await seederService.seedAuthData();
   app.setBaseViewsDir(join(__dirname, "..", "..", "src", "views"));
   app.setViewEngine("ejs");
   app.use((req, res, next) => {

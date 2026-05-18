@@ -3,14 +3,14 @@ import {
   IsEmail,
   IsBoolean,
   IsOptional,
-  IsEnum,
   MinLength,
-  IsDateString,
-  IsUrl,
+  MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class LoginDto {
   @IsEmail()
+  @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
@@ -20,45 +20,35 @@ export class LoginDto {
 export class RegisterDto {
   @IsString()
   @MinLength(3)
+  @MaxLength(100)
   fullName: string;
 
   @IsEmail()
+  @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(30)
   phoneNumber: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
+  @MaxLength(128)
   password: string;
 
   @IsBoolean()
   isTcPpAccepted: boolean;
 
-  @IsDateString()
+  @IsString()
   @IsOptional()
-  dateOfBirth: string;
+  @MaxLength(80)
+  timezone: string;
 
   @IsString()
   @IsOptional()
-  gender: string;
-
-  @IsString()
-  @IsOptional()
-  employment: string;
-
-  @IsString()
-  @IsOptional()
-  education: string;
-
-  @IsString()
-  @IsOptional()
-  university: string;
-
-  @IsUrl()
-  @IsOptional()
-  linkedinUrl: string;
+  @MaxLength(120)
+  companyName: string;
 }
 
 export class VerifyOtpDto {
@@ -74,18 +64,21 @@ export class RefreshTokenDto {
 
 export class ForgotPasswordDto {
   @IsEmail()
+  @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
 }
 
 export class ResetPasswordDto {
   @IsEmail()
+  @Transform(({ value }) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
   otp: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
+  @MaxLength(128)
   newPassword: string;
 }
 
@@ -94,6 +87,7 @@ export class ChangePasswordDto {
   oldPassword: string;
 
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
+  @MaxLength(128)
   newPassword: string;
 }

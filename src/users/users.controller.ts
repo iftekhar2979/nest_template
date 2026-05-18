@@ -28,6 +28,7 @@ import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from 'src/common/multer/multer.config';
+import { RoleType } from './schema/users.schema';
 
 // import { PinService } from 'src/pin/pin.service';
 
@@ -38,14 +39,14 @@ export class UserController {
   ) { }
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user', 'admin')
+  @Roles(RoleType.CLIENT, RoleType.ADMIN, RoleType.SUPERADMIN)
   async accountInfoMe(@Request() req: any) {
     let id = req.user.id;
     return await this.userService.findOne(id);
   }
   @Patch('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user', 'admin')
+  @Roles(RoleType.CLIENT, RoleType.ADMIN, RoleType.SUPERADMIN)
   updateUserInfo(@Request() req: any) {
     let id = req.user.id;
     return this.userService.update(id, req.body);
@@ -57,7 +58,7 @@ export class UserController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   findAll(@Query() query: { limit: number; page: number, term: string }) {
     try {
       return this.userService.findAll({
@@ -71,27 +72,27 @@ export class UserController {
   }
   @Get('/count')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   countDocument() {
     return this.userService.count();
 
   }
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user')
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   findOne(@Param('id') id: string) {
     return this.userService.findOne(id);
   }
 
   @Put(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user')
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   update(@Param('id') id: string, @Body() updateUserDto: any) {
     return this.userService.update(id, updateUserDto);
   }
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('user')
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   delete(@Param('id') id: string) {
     return this.userService.delete(id);
   }

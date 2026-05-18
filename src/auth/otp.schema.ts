@@ -6,9 +6,8 @@ import { Base } from '../common/schema/base.schema';
 export class Otp extends Base {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Profile',
+    ref: 'User',
     default: null,
-    unique: true,
   })
   userID: mongoose.Schema.Types.ObjectId;
   @Prop({ required: true })
@@ -25,3 +24,5 @@ export const OtpSchema = SchemaFactory.createForClass(Otp);
 Otp.applyBaseHooks(OtpSchema);
 
 OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3000 });
+OtpSchema.index({ userID: 1 }, { unique: true, name: 'idx_otp_user_id' });
+OtpSchema.index({ userID: 1, oneTimePassword: 1 }, { name: 'idx_otp_user_code' });

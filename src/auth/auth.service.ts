@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -11,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import * as argon2 from 'argon2';
+import { createHash, randomUUID } from 'crypto';
 import {
   RegisterDto,
   LoginDto,
@@ -24,8 +24,11 @@ import { OtpRepository } from './repositories/otp.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { generateOtp } from '../common/utils/generateOtp';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
-import { User } from '../users/schema/users.schema';
-import { ObjectId, Types } from 'mongoose';
+import { RoleType, User, UserStatus } from '../users/schema/users.schema';
+import { Types } from 'mongoose';
+import { EMAIL_CONSTANTS } from '../emailservice/constants/email.constants';
+import { RoleRepository } from './repositories/role.repository';
+import { ClientRepository } from '../clients/clients.repository';
 
 @Injectable()
 export class AuthService {
@@ -33,24 +36,38 @@ export class AuthService {
     private readonly userRepository: UserRepository,
     private readonly otpRepository: OtpRepository,
     private readonly refreshTokenRepository: RefreshTokenRepository,
+    private readonly roleRepository: RoleRepository,
+    private readonly clientRepository: ClientRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectQueue('EMAIL_QUEUE') private readonly emailQueue: Queue,
   ) { }
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.userRepository.findByEmail(registerDto.email);
+    const email = registerDto.email.toLowerCase().trim();
+    const existingUser = await this.userRepository.findByEmailIncludingInactive(email);
     if (existingUser) {
       throw new BadRequestException('User with this email already exists!');
     }
 
-    // Create user with isEmailVerified = false
     const newUser = await this.userRepository.create({
-      ...registerDto,
+      email,
+      fullName: registerDto.fullName.trim(),
+      phoneNumber: registerDto.phoneNumber,
+      timezone: registerDto.timezone,
+      passwordHash: registerDto.password,
+      role: RoleType.CLIENT,
       isEmailVerified: false,
+      isTcPpAccepted: registerDto.isTcPpAccepted,
+      status: UserStatus.ACTIVE,
     });
 
-    // Generate and save OTP
+    await this.clientRepository.createForUser({
+      userId: newUser._id as Types.ObjectId,
+      companyName: registerDto.companyName,
+      phone: registerDto.phoneNumber,
+    });
+
     const otpCode = generateOtp();
     const expiryDate = new Date();
     expiryDate.setMinutes(expiryDate.getMinutes() + AUTH_CONSTANTS.OTP.EXPIRY_MINUTES);
@@ -61,8 +78,7 @@ export class AuthService {
       expiredAt: expiryDate,
     });
 
-    // Push to BullMQ
-    await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
+    await this.emailQueue.add(EMAIL_CONSTANTS.SEND_OTP, {
       email: newUser.email,
       otp: otpCode,
       fullName: newUser.fullName,
@@ -89,34 +105,32 @@ export class AuthService {
       throw new BadRequestException('OTP has expired');
     }
 
-    // Update user
     await this.userRepository.updateById(userId, {
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
     });
 
-    // Delete OTP
     await this.otpRepository.deleteByUserId(userId);
 
     return { message: 'Email verified successfully' };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.userRepository.findByEmail(loginDto.email);
+  async login(loginDto: LoginDto, context?: { ip?: string; userAgent?: string }) {
+    const user = await this.userRepository.findByEmailIncludingInactive(loginDto.email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await argon2.verify(user.password, loginDto.password);
+    this.assertAccountCanAuthenticate(user);
+
+    const isPasswordValid = await argon2.verify(user.passwordHash, loginDto.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     if (!user.isEmailVerified) {
-      // Invalidate existing sessions
       await this.refreshTokenRepository.revokeAllByUserId(user['_id']);
 
-      // Generate and save a new OTP
       const otpCode = generateOtp();
       const expiryDate = new Date();
       expiryDate.setMinutes(expiryDate.getMinutes() + AUTH_CONSTANTS.OTP.EXPIRY_MINUTES);
@@ -128,8 +142,7 @@ export class AuthService {
         expiredAt: expiryDate,
       });
 
-      // Push email task to BullMQ
-      await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
+      await this.emailQueue.add(EMAIL_CONSTANTS.SEND_OTP, {
         email: user.email,
         otp: otpCode,
         fullName: user.fullName,
@@ -138,10 +151,12 @@ export class AuthService {
       throw new ForbiddenException('Please verify your email first. A new OTP has been sent to your email.');
     }
 
-    return this.generateTokens(user);
+    await this.userRepository.updateLastLoginAt(user['_id']);
+
+    return this.generateTokens(user, context);
   }
 
-  async refreshToken(refreshTokenDto: RefreshTokenDto) {
+  async refreshToken(refreshTokenDto: RefreshTokenDto, context?: { ip?: string; userAgent?: string }) {
     const { refreshToken } = refreshTokenDto;
 
     let payload;
@@ -153,25 +168,30 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const tokenRecord = await this.refreshTokenRepository.findByToken(refreshToken);
+    const tokenHash = this.hashToken(refreshToken);
+    const tokenRecord = await this.refreshTokenRepository.findByTokenHash(tokenHash);
     if (!tokenRecord || tokenRecord.isRevoked || tokenRecord.expiresAt < new Date()) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const user = await this.userRepository.findById(payload.sub);
+    const user = await this.userRepository.findByIdIncludingInactive(payload.sub);
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    // Revoke old token
-    await this.refreshTokenRepository.revokeByToken(refreshToken);
+    this.assertAccountCanAuthenticate(user);
 
-    // Issue new tokens
-    return this.generateTokens(user);
+    const tokens = await this.generateTokens(user, context);
+    await this.refreshTokenRepository.revokeByTokenHash(
+      tokenHash,
+      this.hashToken(tokens.refreshToken),
+    );
+
+    return tokens;
   }
 
   async logout(refreshToken: string) {
-    await this.refreshTokenRepository.revokeByToken(refreshToken);
+    await this.refreshTokenRepository.revokeByTokenHash(this.hashToken(refreshToken));
     return { message: 'Logged out successfully' };
   }
 
@@ -197,7 +217,7 @@ export class AuthService {
       expiredAt: expiryDate,
     });
 
-    await this.emailQueue.add('EMAIL_CONSTANTS.SEND_OTP', {
+    await this.emailQueue.add(EMAIL_CONSTANTS.SEND_OTP, {
       email: user.email,
       otp: otpCode,
       fullName: user.fullName,
@@ -217,39 +237,42 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // Update password
     await this.userRepository.updateById(user['_id'], {
-      password: resetPasswordDto.newPassword,
+      passwordHash: resetPasswordDto.newPassword,
     });
 
-    // Invalidate all refresh tokens
     await this.refreshTokenRepository.revokeAllByUserId(user['_id']);
 
-    // Delete OTP
     await this.otpRepository.deleteByUserId(user['_id']);
 
     return { message: 'Password reset successfully' };
   }
 
-  private async generateTokens(user: User) {
-    const payload = { sub: user['_id'], email: user.email, role: user.role };
+  private async generateTokens(user: User, context?: { ip?: string; userAgent?: string }) {
+    const role = await this.roleRepository.findById(user.role);
+    const payload = {
+      sub: user['_id'].toString(),
+      email: user.email,
+      role: user.role,
+      permissions: role?.permissions ?? [],
+    };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY.ACCESS_TOKEN,
+      expiresIn: this.configService.get<string>('ACCESS_TOKEN_EXPIRY') || AUTH_CONSTANTS.TOKEN_EXPIRY.ACCESS_TOKEN,
     });
 
     const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY.REFRESH_TOKEN,
+      jwtid: randomUUID(),
+      expiresIn: this.configService.get<string>('REFRESH_TOKEN_EXPIRY') || AUTH_CONSTANTS.TOKEN_EXPIRY.REFRESH_TOKEN,
       secret: this.configService.get('JWT_REFRESH_SECRET') || this.configService.get('JWT_SECRET'),
     });
 
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30);
-
     await this.refreshTokenRepository.create({
       userId: user['_id'],
-      token: refreshToken,
-      expiresAt: expiryDate,
+      tokenHash: this.hashToken(refreshToken),
+      expiresAt: this.getRefreshTokenExpiryDate(),
+      createdByIp: context?.ip ?? '',
+      userAgent: context?.userAgent ?? '',
     });
 
     return {
@@ -260,7 +283,47 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        permissions: role?.permissions ?? [],
+        isEmailVerified: user.isEmailVerified,
       },
     };
+  }
+
+  private assertAccountCanAuthenticate(user: User): void {
+    if (user.deletedAt || user.status === UserStatus.DELETED) {
+      throw new ForbiddenException('This account has been deleted');
+    }
+
+    if (!user.isActive || user.status === UserStatus.SUSPENDED) {
+      throw new ForbiddenException('This account is suspended');
+    }
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256')
+      .update(token)
+      .digest('hex');
+  }
+
+  private getRefreshTokenExpiryDate(): Date {
+    const expiresIn = this.configService.get<string>('REFRESH_TOKEN_EXPIRY') || AUTH_CONSTANTS.TOKEN_EXPIRY.REFRESH_TOKEN;
+    const match = expiresIn.match(/^(\d+)([smhd])$/);
+
+    if (!match) {
+      const fallback = new Date();
+      fallback.setDate(fallback.getDate() + 30);
+      return fallback;
+    }
+
+    const amount = Number(match[1]);
+    const unit = match[2];
+    const multiplier = {
+      s: 1000,
+      m: 60 * 1000,
+      h: 60 * 60 * 1000,
+      d: 24 * 60 * 60 * 1000,
+    }[unit];
+
+    return new Date(Date.now() + amount * multiplier);
   }
 }

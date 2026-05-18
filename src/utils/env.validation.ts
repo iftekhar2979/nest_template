@@ -9,6 +9,9 @@ export const envSchema = Joi.object({
   DB_URL: Joi.string().required(),
 
   JWT_SECRET: Joi.string().required(),
+  JWT_REFRESH_SECRET: Joi.string().optional(),
+  ACCESS_TOKEN_EXPIRY: Joi.string().default("15m"),
+  REFRESH_TOKEN_EXPIRY: Joi.string().default("30d"),
   EXPIRES_IN: Joi.string().default("30d"),
 
   SMTP_USER: Joi.string().required(),
@@ -36,6 +39,10 @@ export const envSchema = Joi.object({
   ADMIN_NAME: Joi.string().required(),
   ADMIN_PROFILE_PICTURE: Joi.string().required(),
   ADMIN_PHONE: Joi.string().required(),
+  SUPER_ADMIN_EMAIL: Joi.string().email().optional(),
+  SUPER_ADMIN_PASSWORD: Joi.string().optional(),
+  SUPER_ADMIN_NAME: Joi.string().optional(),
+  SUPER_ADMIN_PHONE: Joi.string().allow("").optional(),
 
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(10),

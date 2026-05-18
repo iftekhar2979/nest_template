@@ -7,6 +7,7 @@ import { User } from './schema/users.schema';
 import { pagination } from 'src/common/pagination/pagination';
 import { IPagination } from 'src/common/pagination/pagination.interface';
 import { CreateUserDto } from './dto/createUser.dto';
+import { RoleType } from './schema/users.schema';
 @Injectable()
 export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) { }
@@ -48,9 +49,9 @@ export class UserService {
           { email: { $regex: new RegExp(query.term, 'i') } },
         ],
         isDeleted: false,
-        role: 'user',
+        role: RoleType.CLIENT,
       })
-      .select('-password')
+      .select('-passwordHash')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -62,7 +63,7 @@ export class UserService {
           { email: { $regex: new RegExp(query.term, 'i') } },
         ],
         isDeleted: false,
-        role: 'user',
+        role: RoleType.CLIENT,
       })
       .exec();
     return { data, pagination: pagination(limit, page, total) };
@@ -78,7 +79,7 @@ export class UserService {
         isEmailVerified: 0,
         profileID: 0,
       })
-      .select('-password')
+      .select('-passwordHash')
       .exec();
   }
   count() {
@@ -89,15 +90,42 @@ export class UserService {
 
   // Update a user by ID
   async update(id: string, updateUserDto: any): Promise<User> {
+    const protectedFields = [
+      'password',
+      'passwordHash',
+      'role',
+      'status',
+      'isActive',
+      'deletedAt',
+      'createdBy',
+      'updatedBy',
+      'isEmailVerified',
+      'emailVerifiedAt',
+      'activePlanId',
+      'subscriptionStatus',
+      'accessExpiresAt',
+      'lastLoginAt',
+    ];
+
+    for (const field of protectedFields) {
+      delete updateUserDto[field];
+    }
+
     return await this.userModel
       .findByIdAndUpdate(id, updateUserDto, { new: true })
       .select(
-        '-password -pin -pinAttempts -isDeleted -isEmailVerified -profileID',
+        '-passwordHash -pin -pinAttempts -isDeleted -isEmailVerified -profileID',
       )
       .exec();
   }
   async findByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();
+  }
+  async findByEmailIncludingInactive(email: string): Promise<User | null> {
+    return this.userModel
+      .findOne({ email: email.toLowerCase().trim() })
+      .setOptions({ ignoreGlobalFilters: true })
+      .exec();
   }
   async delete(id: string): Promise<any> {
     return this.userModel.findByIdAndDelete(id).exec();

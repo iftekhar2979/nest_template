@@ -13,19 +13,33 @@ export class RefreshTokenRepository {
     return await newToken.save();
   }
 
-  async findByToken(token: string): Promise<RefreshToken | null> {
-    return await this.refreshTokenModel.findOne({ token }).exec();
+  async findByTokenHash(tokenHash: string): Promise<RefreshToken | null> {
+    return await this.refreshTokenModel
+      .findOne({ tokenHash })
+      .select('+tokenHash')
+      .exec();
   }
 
   async findActiveByUserId(userId: Types.ObjectId): Promise<RefreshToken[]> {
     return await this.refreshTokenModel.find({ userId, isRevoked: false, expiresAt: { $gt: new Date() } }).exec();
   }
 
-  async revokeByToken(token: string): Promise<any> {
-    return await this.refreshTokenModel.findOneAndUpdate({ token }, { isRevoked: true }).exec();
+  async revokeByTokenHash(tokenHash: string, replacedByTokenHash?: string): Promise<any> {
+    return await this.refreshTokenModel
+      .findOneAndUpdate(
+        { tokenHash },
+        {
+          isRevoked: true,
+          revokedAt: new Date(),
+          ...(replacedByTokenHash ? { replacedByTokenHash } : {}),
+        },
+      )
+      .exec();
   }
 
   async revokeAllByUserId(userId: Types.ObjectId): Promise<any> {
-    return await this.refreshTokenModel.updateMany({ userId, isRevoked: false }, { isRevoked: true }).exec();
+    return await this.refreshTokenModel
+      .updateMany({ userId, isRevoked: false }, { isRevoked: true, revokedAt: new Date() })
+      .exec();
   }
 }
