@@ -28,6 +28,7 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(@Body() registerDto: RegisterDto) {
+    console.log(registerDto)
     return this.authService.register(registerDto);
   }
 

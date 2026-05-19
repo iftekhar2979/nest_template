@@ -20,6 +20,18 @@ import { RefreshTokensModule } from './refresh_tokens/refresh_tokens.module';
 import * as mongoose from 'mongoose';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { DepartmentsModule } from './departments/departments.module';
+import { TeamsModule } from './teams/teams.module';
+import { RolesModule } from './roles/roles.module';
+import { ClientsModule } from './clients/clients.module';
+import { ServicesModule } from './services/services.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { TransactionsModule } from './transactions/transactions.module';
+import { ProjectsModule } from './projects/projects.module';
+import { MessagingModule } from './messaging/messaging.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -55,6 +67,18 @@ import { ThrottlerModule } from '@nestjs/throttler';
     EmailserviceModule,
     SeedModule,
     SettingsModule,
+    DepartmentsModule,
+    TeamsModule,
+    RolesModule,
+    ClientsModule,
+    ServicesModule,
+    SubscriptionsModule,
+    TransactionsModule,
+    ProjectsModule,
+    MessagingModule,
+    BookingsModule,
+    AuditLogsModule,
+    AnalyticsModule,
     EmailVerificationTokensModule,
     RefreshTokensModule,
     BullModule.forRootAsync({
