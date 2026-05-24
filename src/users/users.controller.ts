@@ -33,9 +33,7 @@ import { RoleType } from './schema/users.schema';
 
 @Controller('users')
 export class UserController {
-  constructor(
-    private readonly userService: UserService,
-  ) { }
+  constructor(private readonly userService: UserService) {}
   @Get('me')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.CLIENT, RoleType.ADMIN, RoleType.SUPERADMIN)
@@ -51,6 +49,8 @@ export class UserController {
     return this.userService.update(id, req.body);
   }
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   create(@Body() createUserDto: CreateUserDto) {
     return this.userService.create(createUserDto);
   }
@@ -58,7 +58,7 @@ export class UserController {
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
-  findAll(@Query() query: { limit: number; page: number, term: string }) {
+  findAll(@Query() query: { limit: number; page: number; term: string }) {
     try {
       return this.userService.findAll({
         ...query,
@@ -74,7 +74,6 @@ export class UserController {
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
   countDocument() {
     return this.userService.count();
-
   }
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -108,9 +107,10 @@ export class UserController {
 
   @Patch('/info/me')
   @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...Object.values(RoleType))
   async updateAccountInformation(
     @Request() req,
-    @Body() info: { name?: string, email?: string },
+    @Body() info: { name?: string; email?: string },
   ) {
     return this.userService.update(req.user.id, info);
   }

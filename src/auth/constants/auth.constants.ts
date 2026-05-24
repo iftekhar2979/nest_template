@@ -1,4 +1,13 @@
 export const AUTH_CONSTANTS = {
+  JWT: {
+    ISSUER: 'ilmifytech-api',
+    ALGORITHM: 'HS256' as const,
+    AUDIENCE: {
+      ACCESS: 'ilmifytech-api:access',
+      REFRESH: 'ilmifytech-api:refresh',
+      EMAIL_VERIFICATION: 'ilmifytech-api:email-verification',
+    },
+  },
   ROLES: {
     SUPERADMIN: 'superadmin',
     ADMIN: 'admin',

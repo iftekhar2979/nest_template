@@ -7,7 +7,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { Otp, OtpSchema } from './otp.schema';
-import { RefreshToken, RefreshTokenSchema } from './schema/refresh-token.schema';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from './schema/refresh-token.schema';
 import { Role, RoleSchema } from './schema/role.schema';
 import { EmailserviceModule } from 'src/emailservice/emailservice.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -19,6 +22,7 @@ import { JwtStrategy } from './guard/jwt.strategy';
 import { Client, ClientSchema } from '../clients/schema/clients.schema';
 import { ClientRepository } from '../clients/clients.repository';
 import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-proxy.guard';
+import { AUTH_CONSTANTS } from './constants/auth.constants';
 
 @Module({
   imports: [
@@ -32,10 +36,28 @@ import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-pro
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get<string>('ACCESS_TOKEN_EXPIRY') }, // Default access token expiry
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET is required');
+        }
+
+        return {
+          secret,
+          signOptions: {
+            issuer:
+              configService.get<string>('JWT_ISSUER') ||
+              AUTH_CONSTANTS.JWT.ISSUER,
+            audience:
+              configService.get<string>('JWT_ACCESS_AUDIENCE') ||
+              AUTH_CONSTANTS.JWT.AUDIENCE.ACCESS,
+            algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
+            expiresIn:
+              configService.get<string>('ACCESS_TOKEN_EXPIRY') ||
+              AUTH_CONSTANTS.TOKEN_EXPIRY.ACCESS_TOKEN,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     UsersModule,
@@ -54,4 +76,4 @@ import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-pro
   controllers: [AuthController],
   exports: [AuthService],
 })
-export class AuthModule { }
+export class AuthModule {}

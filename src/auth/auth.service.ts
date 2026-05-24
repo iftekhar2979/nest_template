@@ -51,11 +51,13 @@ type AuthJwtPayload = {
   role: RoleType;
   permissions: string[];
   tokenUse: 'access' | 'refresh';
+  jti: string;
 };
 
 type EmailVerificationJwtPayload = {
   sub: string;
   tokenUse: 'email_verification';
+  jti: string;
 };
 
 type AuthTokens = {
@@ -164,6 +166,7 @@ export class AuthService {
       const user =
         await this.userRepository.findByEmailIncludingInactive(email);
       if (!user) {
+        await this.runPasswordHashTimingPad(loginDto.password);
         throw new UnauthorizedException('Invalid credentials');
       }
 
@@ -175,7 +178,9 @@ export class AuthService {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      this.assertAccountCanAuthenticate(user);
+      if (!this.canAccountAuthenticate(user)) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
 
       if (!user.isEmailVerified) {
         await this.refreshTokenRepository.revokeAllByUserId(
@@ -323,7 +328,7 @@ export class AuthService {
   }
 
   private async issueOtp(user: User): Promise<void> {
-    const otpCode = this.generateOtpCode();
+    const otpCode = this.generateOtpCode(AUTH_CONSTANTS.OTP.LENGTH);
     const expiryDate = new Date(
       Date.now() + AUTH_CONSTANTS.OTP.EXPIRY_MINUTES * 60 * 1000,
     );
@@ -402,6 +407,11 @@ export class AuthService {
       this.jwtService.signAsync(
         { ...basePayload, tokenUse: 'access' },
         {
+          jwtid: randomUUID(),
+          secret: this.getAccessTokenSecret(),
+          issuer: this.getJwtIssuer(),
+          audience: this.getAccessTokenAudience(),
+          algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
           expiresIn:
             this.configService.get<string>('ACCESS_TOKEN_EXPIRY') ||
             AUTH_CONSTANTS.TOKEN_EXPIRY.ACCESS_TOKEN,
@@ -411,6 +421,9 @@ export class AuthService {
         { ...basePayload, tokenUse: 'refresh' },
         {
           jwtid: randomUUID(),
+          issuer: this.getJwtIssuer(),
+          audience: this.getRefreshTokenAudience(),
+          algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
           expiresIn:
             this.configService.get<string>('REFRESH_TOKEN_EXPIRY') ||
             AUTH_CONSTANTS.TOKEN_EXPIRY.REFRESH_TOKEN,
@@ -462,9 +475,17 @@ export class AuthService {
     try {
       const payload = this.jwtService.verify<AuthJwtPayload>(refreshToken, {
         secret: this.getRefreshTokenSecret(),
+        issuer: this.getJwtIssuer(),
+        audience: this.getRefreshTokenAudience(),
+        algorithms: [AUTH_CONSTANTS.JWT.ALGORITHM],
       });
 
-      if (payload.tokenUse !== 'refresh' || !payload.sub || !payload.email) {
+      if (
+        payload.tokenUse !== 'refresh' ||
+        !payload.sub ||
+        !payload.email ||
+        !payload.jti
+      ) {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
@@ -484,6 +505,10 @@ export class AuthService {
         tokenUse: 'email_verification',
       },
       {
+        jwtid: randomUUID(),
+        issuer: this.getJwtIssuer(),
+        audience: this.getEmailVerificationTokenAudience(),
+        algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
         expiresIn:
           this.configService.get<string>('EMAIL_VERIFICATION_TOKEN_EXPIRY') ||
           AUTH_CONSTANTS.TOKEN_EXPIRY.EMAIL_VERIFICATION_TOKEN,
@@ -500,10 +525,17 @@ export class AuthService {
         verificationToken,
         {
           secret: this.getEmailVerificationTokenSecret(),
+          issuer: this.getJwtIssuer(),
+          audience: this.getEmailVerificationTokenAudience(),
+          algorithms: [AUTH_CONSTANTS.JWT.ALGORITHM],
         },
       );
 
-      if (payload.tokenUse !== 'email_verification' || !payload.sub) {
+      if (
+        payload.tokenUse !== 'email_verification' ||
+        !payload.sub ||
+        !payload.jti
+      ) {
         throw new UnauthorizedException('Invalid verification token');
       }
 
@@ -562,6 +594,23 @@ export class AuthService {
     return Array.from({ length }, () => randomInt(0, 10).toString()).join('');
   }
 
+  private async runPasswordHashTimingPad(password: string): Promise<void> {
+    await argon2.hash(password);
+  }
+
+  private getAccessTokenSecret(): string {
+    const secret = this.configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      this.logger.error('JWT access secret is not configured');
+      throw new InternalServerErrorException(
+        'Authentication service is not configured',
+      );
+    }
+
+    return secret;
+  }
+
   private getRefreshTokenSecret(): string {
     const secret =
       this.configService.get<string>('JWT_REFRESH_SECRET') ||
@@ -575,6 +624,33 @@ export class AuthService {
     }
 
     return secret;
+  }
+
+  private getJwtIssuer(): string {
+    return (
+      this.configService.get<string>('JWT_ISSUER') || AUTH_CONSTANTS.JWT.ISSUER
+    );
+  }
+
+  private getAccessTokenAudience(): string {
+    return (
+      this.configService.get<string>('JWT_ACCESS_AUDIENCE') ||
+      AUTH_CONSTANTS.JWT.AUDIENCE.ACCESS
+    );
+  }
+
+  private getRefreshTokenAudience(): string {
+    return (
+      this.configService.get<string>('JWT_REFRESH_AUDIENCE') ||
+      AUTH_CONSTANTS.JWT.AUDIENCE.REFRESH
+    );
+  }
+
+  private getEmailVerificationTokenAudience(): string {
+    return (
+      this.configService.get<string>('JWT_EMAIL_VERIFICATION_AUDIENCE') ||
+      AUTH_CONSTANTS.JWT.AUDIENCE.EMAIL_VERIFICATION
+    );
   }
 
   private getEmailVerificationTokenSecret(): string {
