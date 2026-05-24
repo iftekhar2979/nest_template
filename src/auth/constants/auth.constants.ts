@@ -6,6 +6,8 @@ export const AUTH_CONSTANTS = {
       ACCESS: 'ilmifytech-api:access',
       REFRESH: 'ilmifytech-api:refresh',
       EMAIL_VERIFICATION: 'ilmifytech-api:email-verification',
+      PASSWORD_RESET_VERIFICATION: 'ilmifytech-api:password-reset-verification',
+      PASSWORD_RESET: 'ilmifytech-api:password-reset',
     },
   },
   ROLES: {
@@ -23,9 +25,11 @@ export const AUTH_CONSTANTS = {
     ACCESS_TOKEN: '15m',
     REFRESH_TOKEN: '30d',
     EMAIL_VERIFICATION_TOKEN: '10m',
+    PASSWORD_RESET_VERIFICATION_TOKEN: '3m',
+    PASSWORD_RESET_TOKEN: '2m',
   },
   OTP: {
-    EXPIRY_MINUTES: 5,
+    EXPIRY_MINUTES: 3,
     LENGTH: 6,
     MAX_ATTEMPTS: 5,
   },

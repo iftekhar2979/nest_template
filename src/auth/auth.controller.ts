@@ -20,6 +20,8 @@ import {
 } from './dto/auth.dto';
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
 import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-proxy.guard';
+import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
+import { AuthRateLimit } from './decorators/auth-rate-limit.decorator';
 
 type RequestUser = {
   sub: string;
@@ -30,24 +32,30 @@ type AuthenticatedRequest = Request & {
 };
 
 @Controller('auth')
-@UseGuards(ThrottlerBehindProxyGuard)
+@UseGuards(AuthRateLimitGuard, ThrottlerBehindProxyGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @AuthRateLimit('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
   }
 
-  @Post('verify-email')
+  @Post('verify-otp')
+  @AuthRateLimit('verify-otp')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async verifyEmail(@Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.verifyEmail(verifyOtpDto);
+  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto, @Req() req: Request) {
+    return this.authService.verifyOtp(
+      verifyOtpDto,
+      this.getRequestContext(req),
+    );
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @AuthRateLimit('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     return this.authService.login(loginDto, this.getRequestContext(req));
@@ -55,6 +63,7 @@ export class AuthController {
 
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
+  @AuthRateLimit('refresh-token')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async refreshToken(
     @Body() refreshTokenDto: RefreshTokenDto,
@@ -67,6 +76,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @AuthRateLimit('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async logout(
@@ -77,6 +87,7 @@ export class AuthController {
   }
 
   @Post('logout-all')
+  @AuthRateLimit('logout-all')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async logoutAll(@Req() req: AuthenticatedRequest) {
@@ -85,6 +96,7 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @AuthRateLimit('forgot-password')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
     return this.authService.forgotPassword(forgotPasswordDto);
@@ -92,6 +104,7 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @AuthRateLimit('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);

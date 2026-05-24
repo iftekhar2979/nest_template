@@ -23,6 +23,7 @@ import { Client, ClientSchema } from '../clients/schema/clients.schema';
 import { ClientRepository } from '../clients/clients.repository';
 import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-proxy.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
     ClientRepository,
     JwtStrategy,
     ThrottlerBehindProxyGuard,
+    AuthRateLimitGuard,
   ],
   controllers: [AuthController],
   exports: [AuthService],

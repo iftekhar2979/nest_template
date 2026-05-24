@@ -60,6 +60,22 @@ type EmailVerificationJwtPayload = {
   jti: string;
 };
 
+type PasswordResetVerificationJwtPayload = {
+  sub: string;
+  tokenUse: 'password_reset_verification';
+  jti: string;
+};
+
+type PasswordResetJwtPayload = {
+  sub: string;
+  tokenUse: 'password_reset';
+  jti: string;
+};
+
+type OtpVerificationJwtPayload =
+  | EmailVerificationJwtPayload
+  | PasswordResetVerificationJwtPayload;
+
 type AuthTokens = {
   accessToken: string;
   refreshToken: string;
@@ -126,11 +142,24 @@ export class AuthService {
     }
   }
 
-  async verifyEmail(verifyOtpDto: VerifyOtpDto) {
+  async verifyOtp(verifyOtpDto: VerifyOtpDto, context?: AuthRequestContext) {
+    const payload = this.verifyOtpVerificationToken(
+      verifyOtpDto.verificationToken,
+    );
+
+    if (payload.tokenUse === 'email_verification') {
+      return this.verifyEmailOtp(payload, verifyOtpDto.code, context);
+    }
+
+    return this.verifyPasswordResetOtp(payload, verifyOtpDto.code);
+  }
+
+  private async verifyEmailOtp(
+    verificationPayload: EmailVerificationJwtPayload,
+    code: string,
+    context?: AuthRequestContext,
+  ) {
     try {
-      const verificationPayload = this.verifyEmailVerificationToken(
-        verifyOtpDto.verificationToken,
-      );
       const user = await this.userRepository.findByIdIncludingInactive(
         this.toObjectId(verificationPayload.sub),
       );
@@ -143,10 +172,15 @@ export class AuthService {
 
       if (user.isEmailVerified) {
         await this.otpRepository.deleteByUserId(normalizedUserId);
-        return { message: 'Email already verified' };
+        const role = await this.getRole(user.role);
+        const tokens = await this.signTokens(user, role?.permissions ?? []);
+        await this.storeRefreshToken(user, tokens.refreshToken, context);
+        await this.userRepository.updateLastLoginAt(normalizedUserId);
+
+        return this.buildAuthResponse(user, tokens, role);
       }
 
-      await this.verifyOtpOrThrow(normalizedUserId, verifyOtpDto.code);
+      await this.verifyOtpOrThrow(normalizedUserId, code);
 
       await this.userRepository.updateById(normalizedUserId, {
         isEmailVerified: true,
@@ -154,9 +188,17 @@ export class AuthService {
       });
       await this.otpRepository.deleteByUserId(normalizedUserId);
 
-      return { message: 'Email verified successfully' };
+      user.isEmailVerified = true;
+      user.emailVerifiedAt = new Date();
+
+      const role = await this.getRole(user.role);
+      const tokens = await this.signTokens(user, role?.permissions ?? []);
+      await this.storeRefreshToken(user, tokens.refreshToken, context);
+      await this.userRepository.updateLastLoginAt(normalizedUserId);
+
+      return this.buildAuthResponse(user, tokens, role);
     } catch (error) {
-      this.handleAuthError(error, 'verifyEmail');
+      this.handleAuthError(error, 'verifyEmailOtp');
     }
   }
 
@@ -288,30 +330,61 @@ export class AuthService {
         this.normalizeEmail(forgotPasswordDto.email),
       );
       if (!user || !this.canAccountAuthenticate(user)) {
-        return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+        return {
+          message: PASSWORD_RESET_REQUEST_MESSAGE,
+          verificationToken: await this.signPasswordResetVerificationToken(
+            new Types.ObjectId().toString(),
+          ),
+        };
       }
 
       await this.issueOtp(user);
 
-      return { message: PASSWORD_RESET_REQUEST_MESSAGE };
+      return {
+        message: PASSWORD_RESET_REQUEST_MESSAGE,
+        verificationToken: await this.signPasswordResetVerificationToken(
+          user._id.toString(),
+        ),
+      };
     } catch (error) {
       this.handleAuthError(error, 'forgotPassword');
     }
   }
 
-  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+  private async verifyPasswordResetOtp(
+    verificationPayload: PasswordResetVerificationJwtPayload,
+    code: string,
+  ) {
     try {
-      const user = await this.userRepository.findByEmailIncludingInactive(
-        this.normalizeEmail(resetPasswordDto.email),
+      const user = await this.userRepository.findByIdIncludingInactive(
+        this.toObjectId(verificationPayload.sub),
       );
       if (!user || !this.canAccountAuthenticate(user)) {
-        return { message: PASSWORD_RESET_RESULT_MESSAGE };
+        throw new BadRequestException('Invalid or expired OTP');
       }
 
-      await this.verifyOtpOrThrow(
-        user._id as Types.ObjectId,
-        resetPasswordDto.otp,
+      await this.verifyOtpOrThrow(user._id as Types.ObjectId, code);
+      await this.otpRepository.deleteByUserId(user._id as Types.ObjectId);
+
+      return {
+        resetToken: await this.signPasswordResetToken(user),
+      };
+    } catch (error) {
+      this.handleAuthError(error, 'verifyPasswordResetOtp');
+    }
+  }
+
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    try {
+      const payload = this.verifyPasswordResetToken(
+        resetPasswordDto.resetToken,
       );
+      const user = await this.userRepository.findByIdIncludingInactive(
+        this.toObjectId(payload.sub),
+      );
+      if (!user || !this.canAccountAuthenticate(user)) {
+        throw new UnauthorizedException('Invalid reset token');
+      }
 
       await this.userRepository.updateById(user._id as Types.ObjectId, {
         passwordHash: resetPasswordDto.newPassword,
@@ -548,6 +621,130 @@ export class AuthService {
     }
   }
 
+  private async signPasswordResetVerificationToken(
+    userId: string,
+  ): Promise<string> {
+    return this.jwtService.signAsync(
+      {
+        sub: userId,
+        tokenUse: 'password_reset_verification',
+      },
+      {
+        jwtid: randomUUID(),
+        issuer: this.getJwtIssuer(),
+        audience: this.getPasswordResetVerificationTokenAudience(),
+        algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
+        expiresIn:
+          this.configService.get<string>(
+            'PASSWORD_RESET_VERIFICATION_TOKEN_EXPIRY',
+          ) || AUTH_CONSTANTS.TOKEN_EXPIRY.PASSWORD_RESET_VERIFICATION_TOKEN,
+        secret: this.getPasswordResetVerificationTokenSecret(),
+      },
+    );
+  }
+
+  private verifyPasswordResetVerificationToken(
+    verificationToken: string,
+  ): PasswordResetVerificationJwtPayload {
+    try {
+      const payload =
+        this.jwtService.verify<PasswordResetVerificationJwtPayload>(
+          verificationToken,
+          {
+            secret: this.getPasswordResetVerificationTokenSecret(),
+            issuer: this.getJwtIssuer(),
+            audience: this.getPasswordResetVerificationTokenAudience(),
+            algorithms: [AUTH_CONSTANTS.JWT.ALGORITHM],
+          },
+        );
+
+      if (
+        payload.tokenUse !== 'password_reset_verification' ||
+        !payload.sub ||
+        !payload.jti
+      ) {
+        throw new UnauthorizedException('Invalid verification token');
+      }
+
+      return payload;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid verification token');
+    }
+  }
+
+  private verifyOtpVerificationToken(
+    verificationToken: string,
+  ): OtpVerificationJwtPayload {
+    const decoded = this.jwtService.decode(verificationToken);
+    if (!decoded || typeof decoded === 'string') {
+      throw new UnauthorizedException('Invalid verification token');
+    }
+
+    const tokenUse = (decoded as { tokenUse?: string }).tokenUse;
+    if (tokenUse === 'email_verification') {
+      return this.verifyEmailVerificationToken(verificationToken);
+    }
+
+    if (tokenUse === 'password_reset_verification') {
+      return this.verifyPasswordResetVerificationToken(verificationToken);
+    }
+
+    throw new UnauthorizedException('Invalid verification token');
+  }
+
+  private async signPasswordResetToken(user: User): Promise<string> {
+    return this.jwtService.signAsync(
+      {
+        sub: user._id.toString(),
+        tokenUse: 'password_reset',
+      },
+      {
+        jwtid: randomUUID(),
+        issuer: this.getJwtIssuer(),
+        audience: this.getPasswordResetTokenAudience(),
+        algorithm: AUTH_CONSTANTS.JWT.ALGORITHM,
+        expiresIn:
+          this.configService.get<string>('PASSWORD_RESET_TOKEN_EXPIRY') ||
+          AUTH_CONSTANTS.TOKEN_EXPIRY.PASSWORD_RESET_TOKEN,
+        secret: this.getPasswordResetTokenSecret(),
+      },
+    );
+  }
+
+  private verifyPasswordResetToken(
+    resetToken: string,
+  ): PasswordResetJwtPayload {
+    try {
+      const payload = this.jwtService.verify<PasswordResetJwtPayload>(
+        resetToken,
+        {
+          secret: this.getPasswordResetTokenSecret(),
+          issuer: this.getJwtIssuer(),
+          audience: this.getPasswordResetTokenAudience(),
+          algorithms: [AUTH_CONSTANTS.JWT.ALGORITHM],
+        },
+      );
+
+      if (
+        payload.tokenUse !== 'password_reset' ||
+        !payload.sub ||
+        !payload.jti
+      ) {
+        throw new UnauthorizedException('Invalid reset token');
+      }
+
+      return payload;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Invalid reset token');
+    }
+  }
+
   private async getRole(roleId: RoleType): Promise<Role | null> {
     return this.roleRepository.findById(roleId);
   }
@@ -653,6 +850,21 @@ export class AuthService {
     );
   }
 
+  private getPasswordResetVerificationTokenAudience(): string {
+    return (
+      this.configService.get<string>(
+        'JWT_PASSWORD_RESET_VERIFICATION_AUDIENCE',
+      ) || AUTH_CONSTANTS.JWT.AUDIENCE.PASSWORD_RESET_VERIFICATION
+    );
+  }
+
+  private getPasswordResetTokenAudience(): string {
+    return (
+      this.configService.get<string>('JWT_PASSWORD_RESET_AUDIENCE') ||
+      AUTH_CONSTANTS.JWT.AUDIENCE.PASSWORD_RESET
+    );
+  }
+
   private getEmailVerificationTokenSecret(): string {
     const secret =
       this.configService.get<string>('JWT_EMAIL_VERIFICATION_SECRET') ||
@@ -660,6 +872,39 @@ export class AuthService {
 
     if (!secret) {
       this.logger.error('JWT email verification secret is not configured');
+      throw new InternalServerErrorException(
+        'Authentication service is not configured',
+      );
+    }
+
+    return secret;
+  }
+
+  private getPasswordResetVerificationTokenSecret(): string {
+    const secret =
+      this.configService.get<string>(
+        'JWT_PASSWORD_RESET_VERIFICATION_SECRET',
+      ) || this.configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      this.logger.error(
+        'JWT password reset verification secret is not configured',
+      );
+      throw new InternalServerErrorException(
+        'Authentication service is not configured',
+      );
+    }
+
+    return secret;
+  }
+
+  private getPasswordResetTokenSecret(): string {
+    const secret =
+      this.configService.get<string>('JWT_PASSWORD_RESET_SECRET') ||
+      this.configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      this.logger.error('JWT password reset secret is not configured');
       throw new InternalServerErrorException(
         'Authentication service is not configured',
       );

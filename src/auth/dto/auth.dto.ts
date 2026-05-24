@@ -88,15 +88,8 @@ export class ForgotPasswordDto {
 }
 
 export class ResetPasswordDto {
-  @IsEmail()
-  @Transform(({ value }) => value?.toLowerCase().trim())
-  email: string;
-
-  @IsString()
-  @IsNumberString()
-  @MinLength(6)
-  @MaxLength(6)
-  otp: string;
+  @IsJWT()
+  resetToken: string;
 
   @IsString()
   @MinLength(8)
