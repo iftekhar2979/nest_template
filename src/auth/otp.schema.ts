@@ -10,7 +10,7 @@ export class Otp extends Base {
     default: null,
   })
   userID: mongoose.Schema.Types.ObjectId;
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   oneTimePassword: string;
   @Prop({ required: true })
   expiredAt: Date;

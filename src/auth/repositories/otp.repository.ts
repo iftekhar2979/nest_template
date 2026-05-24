@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, ObjectId, Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Otp } from '../otp.schema';
 
 @Injectable()
@@ -12,12 +12,35 @@ export class OtpRepository {
     return await newOtp.save();
   }
 
+  async upsertForUser(data: {
+    userID: Types.ObjectId;
+    oneTimePassword: string;
+    expiredAt: Date;
+  }): Promise<Otp> {
+    return this.otpModel
+      .findOneAndUpdate(
+        { userID: data.userID },
+        {
+          $set: {
+            oneTimePassword: data.oneTimePassword,
+            expiredAt: data.expiredAt,
+            attempts: 0,
+          },
+        },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      )
+      .exec();
+  }
+
   async findByUserId(userId: Types.ObjectId): Promise<Otp | null> {
-    return await this.otpModel.findOne({ userID: userId }).exec();
+    return await this.otpModel.findOne({ userID: userId }).select('+oneTimePassword').exec();
   }
 
   async findByUserIdAndCode(userId: Types.ObjectId, code: string): Promise<Otp | null> {
-    return await this.otpModel.findOne({ userID: userId, oneTimePassword: code }).exec();
+    return await this.otpModel
+      .findOne({ userID: userId, oneTimePassword: code })
+      .select('+oneTimePassword')
+      .exec();
   }
 
   async deleteByUserId(userId: Types.ObjectId): Promise<any> {

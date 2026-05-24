@@ -23,14 +23,23 @@ export class ConnectivityValidator {
 
   private static async checkDatabase(configService: ConfigService) {
     const dbUrl = configService.get<string>('DB_URL');
+    let connection: mongoose.Connection | null = null;
+
     try {
       this.logger.log('Checking Database connection...');
-      const connection = await mongoose.connect(dbUrl);
-      await connection.disconnect();
+      connection = await mongoose.createConnection(dbUrl, {
+        serverSelectionTimeoutMS: 5000,
+      }).asPromise();
+
+      await connection.db.admin().ping();
       this.logger.log('Database connection successful.');
     } catch (error) {
       this.logger.error(`Database connection failed: ${error.message}`);
       throw new Error(`DATABASE_CONNECTION_ERROR: ${error.message}`);
+    } finally {
+      if (connection) {
+        await connection.close();
+      }
     }
   }
 

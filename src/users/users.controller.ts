@@ -20,7 +20,6 @@ import {
   Patch,
 } from '@nestjs/common';
 import { UserService } from './users.service';
-import { IUser } from './users.interface';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import { CreateUserDto } from './dto/createUser.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';

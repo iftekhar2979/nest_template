@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRepository } from '../../users/users.repository';
 import { UserStatus } from '../../users/schema/users.schema';
+import { isValidObjectId } from 'mongoose';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -19,6 +20,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    if (payload.tokenUse !== 'access') {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    if (!payload.sub || !isValidObjectId(payload.sub)) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
     const user = await this.userRepository.findByIdIncludingInactive(payload.sub);
     if (!user || user.deletedAt || user.status === UserStatus.DELETED) {
       throw new UnauthorizedException('Account is not available');

@@ -7,8 +7,9 @@ export class AppService implements OnModuleInit {
   constructor(@InjectConnection() private readonly mongooseConnection: any) {}
   async onModuleInit() {
     let connectionState=this.mongooseConnection?.base.STATES.connected
+    console.log(connectionState)
     if (connectionState === 1) {
-      console.log('Mongoose is connected');
+      console.log('Mongodb is connected');
     } else {
       console.log('Mongoose is not connected');
     }

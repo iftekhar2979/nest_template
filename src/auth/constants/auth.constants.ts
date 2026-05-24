@@ -13,9 +13,11 @@ export const AUTH_CONSTANTS = {
   TOKEN_EXPIRY: {
     ACCESS_TOKEN: '15m',
     REFRESH_TOKEN: '30d',
+    EMAIL_VERIFICATION_TOKEN: '10m',
   },
   OTP: {
     EXPIRY_MINUTES: 5,
     LENGTH: 6,
+    MAX_ATTEMPTS: 5,
   },
 };

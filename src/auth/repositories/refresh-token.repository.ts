@@ -20,6 +20,25 @@ export class RefreshTokenRepository {
       .exec();
   }
 
+  async consumeActiveByTokenHash(tokenHash: string, replacedByTokenHash: string): Promise<RefreshToken | null> {
+    return this.refreshTokenModel
+      .findOneAndUpdate(
+        {
+          tokenHash,
+          isRevoked: false,
+          expiresAt: { $gt: new Date() },
+        },
+        {
+          isRevoked: true,
+          revokedAt: new Date(),
+          replacedByTokenHash,
+        },
+        { new: true },
+      )
+      .select('+tokenHash')
+      .exec();
+  }
+
   async findActiveByUserId(userId: Types.ObjectId): Promise<RefreshToken[]> {
     return await this.refreshTokenModel.find({ userId, isRevoked: false, expiresAt: { $gt: new Date() } }).exec();
   }

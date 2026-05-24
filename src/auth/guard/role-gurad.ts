@@ -29,7 +29,7 @@ export class RolesGuard implements CanActivate {
       throw new UnauthorizedException('Authentication required');
     }
 
-    const hasRole = roles.includes(user.role);
+    const hasRole = user.role === 'superadmin' || roles.includes(user.role);
     if (!hasRole) {
       throw new ForbiddenException('You do not have the required role!');
     }

@@ -3,10 +3,11 @@ import {
   Controller,
   Post,
   UseGuards,
-  Request,
+  Req,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import {
@@ -20,6 +21,14 @@ import {
 import { JwtAuthGuard } from './guard/jwt-auth.guard';
 import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-proxy.guard';
 
+type RequestUser = {
+  sub: string;
+};
+
+type AuthenticatedRequest = Request & {
+  user: RequestUser;
+};
+
 @Controller('auth')
 @UseGuards(ThrottlerBehindProxyGuard)
 export class AuthController {
@@ -28,47 +37,49 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(@Body() registerDto: RegisterDto) {
-    console.log(registerDto)
     return this.authService.register(registerDto);
   }
 
   @Post('verify-email')
-  @UseGuards(JwtAuthGuard)
-  async verifyEmail(@Request() req, @Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.verifyEmail(req.user.sub, verifyOtpDto);
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async verifyEmail(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyEmail(verifyOtpDto);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async login(@Body() loginDto: LoginDto, @Request() req) {
-    return this.authService.login(loginDto, {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
+    return this.authService.login(loginDto, this.getRequestContext(req));
   }
 
   @Post('refresh-token')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto, @Request() req) {
-    return this.authService.refreshToken(refreshTokenDto, {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
-    });
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.refreshToken(
+      refreshTokenDto,
+      this.getRequestContext(req),
+    );
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logout(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.logout(refreshTokenDto.refreshToken);
+  async logout(
+    @Body() refreshTokenDto: RefreshTokenDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.authService.logout(refreshTokenDto.refreshToken, req.user.sub);
   }
 
   @Post('logout-all')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logoutAll(@Request() req) {
+  async logoutAll(@Req() req: AuthenticatedRequest) {
     return this.authService.logoutAll(req.user.sub);
   }
 
@@ -84,5 +95,12 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authService.resetPassword(resetPasswordDto);
+  }
+
+  private getRequestContext(req: Request) {
+    return {
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    };
   }
 }
