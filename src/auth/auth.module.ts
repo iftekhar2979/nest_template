@@ -19,8 +19,6 @@ import { OtpRepository } from './repositories/otp.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { RoleRepository } from './repositories/role.repository';
 import { JwtStrategy } from './guard/jwt.strategy';
-import { Client, ClientSchema } from '../clients/schema/clients.schema';
-import { ClientRepository } from '../clients/clients.repository';
 import { ThrottlerBehindProxyGuard } from '../shared/guards/throttler-behind-proxy.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
@@ -32,7 +30,6 @@ import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
       { name: Otp.name, schema: OtpSchema },
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: Role.name, schema: RoleSchema },
-      { name: Client.name, schema: ClientSchema },
     ]),
     PassportModule,
     JwtModule.registerAsync({
@@ -70,7 +67,6 @@ import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
     OtpRepository,
     RefreshTokenRepository,
     RoleRepository,
-    ClientRepository,
     JwtStrategy,
     ThrottlerBehindProxyGuard,
     AuthRateLimitGuard,

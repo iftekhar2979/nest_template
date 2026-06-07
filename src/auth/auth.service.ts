@@ -31,7 +31,6 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { RoleType, User, UserStatus } from '../users/schema/users.schema';
 import { EMAIL_CONSTANTS } from '../emailservice/constants/email.constants';
 import { RoleRepository } from './repositories/role.repository';
-import { ClientRepository } from '../clients/clients.repository';
 import { Role } from './schema/role.schema';
 
 const PASSWORD_RESET_REQUEST_MESSAGE =
@@ -90,7 +89,6 @@ export class AuthService {
     private readonly otpRepository: OtpRepository,
     private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly roleRepository: RoleRepository,
-    private readonly clientRepository: ClientRepository,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectQueue('EMAIL_QUEUE') private readonly emailQueue: Queue,
@@ -121,12 +119,6 @@ export class AuthService {
         isEmailVerified: false,
         isTcPpAccepted: true,
         status: UserStatus.ACTIVE,
-      });
-
-      await this.clientRepository.createForUser({
-        userId: newUser._id as Types.ObjectId,
-        companyName: registerDto.companyName,
-        phone: registerDto.phoneNumber,
       });
 
       await this.issueOtp(newUser);
