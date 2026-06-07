@@ -1,8 +1,8 @@
-import { Module, OnModuleInit, Logger } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
-import { MongooseModule } from '@nestjs/mongoose';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_FILTER, } from '@nestjs/core';
 import { ValidationExceptionFilter } from './common/filters/validationError';
 import { AuthModule } from './auth/auth.module';
@@ -17,7 +17,6 @@ import { WinstonModule } from 'nest-winston';
 import { winstonLoggerConfig } from './common/configs/winston.config';
 import { EmailVerificationTokensModule } from './email_verification_tokens/email_verification_tokens.module';
 import { RefreshTokensModule } from './refresh_tokens/refresh_tokens.module';
-import * as mongoose from 'mongoose';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -30,10 +29,17 @@ import { ThrottlerModule } from '@nestjs/throttler';
       validationSchema: envSchema,
     }),
     WinstonModule.forRoot(winstonLoggerConfig),
-    MongooseModule.forRootAsync({
+    TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>("DB_URL"),
+        type: 'mysql',
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        username: configService.get<string>('DB_USERNAME'),
+        password: configService.get<string>('DB_PASSWORD'),
+        database: configService.get<string>('DB_NAME'),
+        autoLoadEntities: true,
+        synchronize: true,
       }),
       inject: [ConfigService],
     }),
@@ -79,12 +85,4 @@ import { ThrottlerModule } from '@nestjs/throttler';
     AppService,
   ],
 })
-export class AppModule implements OnModuleInit {
-  private readonly logger = new Logger('Mongoose');
-
-  onModuleInit() {
-    mongoose.set('debug', (collectionName, method, query, doc) => {
-      this.logger.log(`${collectionName}.${method}(${JSON.stringify(query)}) ${doc ? JSON.stringify(doc) : ''}`);
-    });
-  }
-}
+export class AppModule {}

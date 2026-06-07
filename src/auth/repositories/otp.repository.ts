@@ -1,53 +1,66 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Otp } from '../otp.schema';
 
 @Injectable()
 export class OtpRepository {
-  constructor(@InjectModel(Otp.name) private readonly otpModel: Model<Otp>) { }
+  constructor(
+    @InjectRepository(Otp) private readonly otpRepo: Repository<Otp>,
+  ) {}
 
-  async create(data: any): Promise<Otp> {
-    const newOtp = new this.otpModel(data);
-    return await newOtp.save();
+  async create(data: Partial<Otp>): Promise<Otp> {
+    return this.otpRepo.save(this.otpRepo.create(data));
   }
 
   async upsertForUser(data: {
-    userID: Types.ObjectId;
+    userID: string;
     oneTimePassword: string;
     expiredAt: Date;
   }): Promise<Otp> {
-    return this.otpModel
-      .findOneAndUpdate(
-        { userID: data.userID },
-        {
-          $set: {
-            oneTimePassword: data.oneTimePassword,
-            expiredAt: data.expiredAt,
-            attempts: 0,
-          },
-        },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
-      )
-      .exec();
+    const existing = await this.otpRepo.findOne({
+      where: { userID: data.userID },
+    });
+
+    if (existing) {
+      existing.oneTimePassword = data.oneTimePassword;
+      existing.expiredAt = data.expiredAt;
+      existing.attempts = 0;
+      return this.otpRepo.save(existing);
+    }
+
+    return this.otpRepo.save(
+      this.otpRepo.create({
+        userID: data.userID,
+        oneTimePassword: data.oneTimePassword,
+        expiredAt: data.expiredAt,
+        attempts: 0,
+      }),
+    );
   }
 
-  async findByUserId(userId: Types.ObjectId): Promise<Otp | null> {
-    return await this.otpModel.findOne({ userID: userId }).select('+oneTimePassword').exec();
+  async findByUserId(userId: string): Promise<Otp | null> {
+    return this.otpRepo
+      .createQueryBuilder('otp')
+      .addSelect('otp.oneTimePassword')
+      .where('otp.userID = :userId', { userId })
+      .getOne();
   }
 
-  async findByUserIdAndCode(userId: Types.ObjectId, code: string): Promise<Otp | null> {
-    return await this.otpModel
-      .findOne({ userID: userId, oneTimePassword: code })
-      .select('+oneTimePassword')
-      .exec();
+  async findByUserIdAndCode(userId: string, code: string): Promise<Otp | null> {
+    return this.otpRepo
+      .createQueryBuilder('otp')
+      .addSelect('otp.oneTimePassword')
+      .where('otp.userID = :userId', { userId })
+      .andWhere('otp.oneTimePassword = :code', { code })
+      .getOne();
   }
 
-  async deleteByUserId(userId: Types.ObjectId): Promise<any> {
-    return await this.otpModel.deleteMany({ userID: userId }).exec();
+  async deleteByUserId(userId: string): Promise<void> {
+    await this.otpRepo.delete({ userID: userId });
   }
 
-  async incrementAttempts(otpId: Types.ObjectId): Promise<any> {
-    return await this.otpModel.findByIdAndUpdate(otpId, { $inc: { attempts: 1 } }).exec();
+  async incrementAttempts(otpId: string): Promise<void> {
+    await this.otpRepo.increment({ id: otpId }, 'attempts', 1);
   }
 }

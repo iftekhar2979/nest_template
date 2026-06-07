@@ -2,16 +2,13 @@ import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from 'src/users/users.module';
-import { User, UserSchema } from 'src/users/schema/users.schema';
-import { MongooseModule } from '@nestjs/mongoose';
+import { User } from 'src/users/schema/users.schema';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { Otp, OtpSchema } from './otp.schema';
-import {
-  RefreshToken,
-  RefreshTokenSchema,
-} from './schema/refresh-token.schema';
-import { Role, RoleSchema } from './schema/role.schema';
+import { Otp } from './otp.schema';
+import { RefreshToken } from './schema/refresh-token.schema';
+import { Role } from './schema/role.schema';
 import { EmailserviceModule } from 'src/emailservice/emailservice.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UserRepository } from 'src/users/users.repository';
@@ -25,12 +22,7 @@ import { AuthRateLimitGuard } from './guard/auth-rate-limit.guard';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: User.name, schema: UserSchema },
-      { name: Otp.name, schema: OtpSchema },
-      { name: RefreshToken.name, schema: RefreshTokenSchema },
-      { name: Role.name, schema: RoleSchema },
-    ]),
+    TypeOrmModule.forFeature([User, Otp, RefreshToken, Role]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

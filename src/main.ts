@@ -13,6 +13,7 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { json, urlencoded } from "express";
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 import { ConnectivityValidator } from './common/utils/connectivity.validator';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -128,7 +129,7 @@ async function bootstrap() {
     });
   }
   try {
-    await ConnectivityValidator.validate(configService);
+    await ConnectivityValidator.validate(configService, app.get(DataSource));
   } catch (error) {
     app.get(WINSTON_MODULE_NEST_PROVIDER).error(`Application failed to start due to connectivity issues: ${error.message}`);
     process.exit(1);

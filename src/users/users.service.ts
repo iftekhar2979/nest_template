@@ -1,91 +1,73 @@
-import {
-  Injectable,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, } from 'mongoose';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ILike, Repository } from 'typeorm';
 import { User } from './schema/users.schema';
 import { pagination } from 'src/common/pagination/pagination';
 import { IPagination } from 'src/common/pagination/pagination.interface';
 import { CreateUserDto } from './dto/createUser.dto';
 import { RoleType } from './schema/users.schema';
+
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) { }
+  constructor(
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
+
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const newUser = new this.userModel(createUserDto);
-    return newUser.save();
+    return this.userRepo.save(this.userRepo.create(createUserDto as Partial<User>));
   }
+
   async createUser(user): Promise<User> {
-    const newUser = new this.userModel(user);
-    return newUser.save();
+    return this.userRepo.save(this.userRepo.create(user as Partial<User>));
   }
+
   async updateProfilePicture(id: string, url: string): Promise<User> {
-    return this.userModel.findByIdAndUpdate(
-      id,
-      { image: url },
-      { new: true },
-    );
+    await this.userRepo.update({ id }, { avatarUrl: url });
+    return this.userRepo.findOne({ where: { id } });
   }
+
   async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
-    return await this.userModel.findOne({ name: createUserDto.fullName });
+    return this.userRepo.findOne({ where: { fullName: createUserDto.fullName } });
   }
+
   async checkUserExistWiththeEmail(
     createUserDto: CreateUserDto,
   ): Promise<User> {
-    return await this.userModel.findOne({ email: createUserDto.email });
+    return this.userRepo.findOne({ where: { email: createUserDto.email } });
   }
+
   async findAll(query: {
     term: string;
     page: string;
     limit: string;
   }): Promise<{ data: User[]; pagination: IPagination }> {
-    let page = parseFloat(query.page);
-    let limit = parseFloat(query.limit);
+    const page = parseFloat(query.page);
+    const limit = parseFloat(query.limit);
     const skip = (page - 1) * limit;
-    const data = await this.userModel
-      .find({
-        $or: [
-          { name: { $regex: new RegExp(query.term, 'i') } },
-          { email: { $regex: new RegExp(query.term, 'i') } },
-        ],
-        isDeleted: false,
-        role: RoleType.CLIENT,
-      })
-      .select('-passwordHash')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-    const total = await this.userModel
-      .countDocuments({
-        $or: [
-          { name: { $regex: new RegExp(query.term, 'i') } },
-          { email: { $regex: new RegExp(query.term, 'i') } },
-        ],
-        isDeleted: false,
-        role: RoleType.CLIENT,
-      })
-      .exec();
+
+    const term = query.term ?? '';
+    const where = [
+      { fullName: ILike(`%${term}%`), role: RoleType.CLIENT },
+      { email: ILike(`%${term}%`), role: RoleType.CLIENT },
+    ];
+
+    const [data, total] = await this.userRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+
     return { data, pagination: pagination(limit, page, total) };
   }
 
   // Find a user by ID
   findOne(id: string) {
-    return this.userModel
-      .findById(id, {
-        pin: 0,
-        pinAttempts: 0,
-        isDeleted: 0,
-        isEmailVerified: 0,
-        profileID: 0,
-      })
-      .select('-passwordHash')
-      .exec();
+    return this.userRepo.findOne({ where: { id } });
   }
+
   count() {
-    return this.userModel
-      .countDocuments()
-      .exec();
+    return this.userRepo.count();
   }
 
   // Update a user by ID
@@ -111,25 +93,25 @@ export class UserService {
       delete updateUserDto[field];
     }
 
-    return await this.userModel
-      .findByIdAndUpdate(id, updateUserDto, { new: true })
-      .select(
-        '-passwordHash -pin -pinAttempts -isDeleted -isEmailVerified -profileID',
-      )
-      .exec();
+    await this.userRepo.update({ id }, updateUserDto);
+    return this.userRepo.findOne({ where: { id } });
   }
+
   async findByEmail(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    return this.userRepo.findOne({ where: { email } });
   }
+
   async findByEmailIncludingInactive(email: string): Promise<User | null> {
-    return this.userModel
-      .findOne({ email: email.toLowerCase().trim() })
-      .setOptions({ ignoreGlobalFilters: true })
-      .exec();
+    return this.userRepo.findOne({
+      where: { email: email.toLowerCase().trim() },
+      withDeleted: true,
+    });
   }
+
   async delete(id: string): Promise<any> {
-    return this.userModel.findByIdAndDelete(id).exec();
+    return this.userRepo.delete({ id });
   }
+
   async uploadProfilePicture(user: User, file): Promise<any> {
     await this.updateProfilePicture(
       user.id,

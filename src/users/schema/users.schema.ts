@@ -1,5 +1,4 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import * as mongoose from 'mongoose';
+import { BeforeInsert, Column, Entity, Index } from 'typeorm';
 import * as argon2 from 'argon2';
 import { Base } from '../../common/schema/base.schema';
 
@@ -21,100 +20,79 @@ export enum UserStatus {
   DELETED = 'deleted',
 }
 
-@Schema()
+@Entity('users')
+@Index('idx_users_role', ['role'])
+@Index('idx_users_team_id', ['teamId'])
+@Index('idx_users_dept_id', ['departmentId'])
+@Index('idx_users_subscription_lookup', ['subscriptionStatus', 'accessExpiresAt'])
+@Index('idx_users_created_at', ['createdAt'])
 export class User extends Base {
-  @Prop({ required: true, trim: true, lowercase: true })
+  @Index('idx_users_email', { unique: true })
+  @Column({ type: 'varchar', unique: true })
   email: string;
 
-  @Prop({ required: true, select: false })
+  @Column({ type: 'varchar', select: false })
   passwordHash: string;
 
-  @Prop({ required: false })
+  @Column({ type: 'varchar', nullable: true })
   phoneNumber: string;
 
-  @Prop({ required: true, trim: true })
+  @Column({ type: 'varchar' })
   fullName: string;
 
-  @Prop({ required: false, default: '' })
+  @Column({ type: 'varchar', default: '' })
   avatarUrl: string;
 
-  @Prop({ default: false })
+  @Column({ type: 'boolean', default: false })
   isEmailVerified: boolean;
 
-  @Prop({ default: false })
+  @Column({ type: 'boolean', default: false })
   isTcPpAccepted: boolean;
 
-  @Prop({ default: null })
+  @Column({ type: 'datetime', nullable: true, default: null })
   emailVerifiedAt: Date;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'SubscriptionPlan', default: null })
-  activePlanId: mongoose.Schema.Types.ObjectId;
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  activePlanId: string;
 
-  @Prop({ required: false })
+  @Column({ type: 'varchar', nullable: true })
   subscriptionStatus: string; // active | expired | cancelled | trialing
 
-  @Prop({ default: null })
+  @Column({ type: 'datetime', nullable: true, default: null })
   accessExpiresAt: Date;
 
-  @Prop({ enum: RoleType, default: RoleType.CLIENT })
+  @Column({ type: 'enum', enum: RoleType, default: RoleType.CLIENT })
   role: RoleType;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null })
-  teamId: mongoose.Schema.Types.ObjectId;
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  teamId: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Department', default: null })
-  departmentId: mongoose.Schema.Types.ObjectId;
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  departmentId: string;
 
-  @Prop({ required: false })
+  @Column({ type: 'varchar', nullable: true })
   timezone: string;
 
-  @Prop({ default: null })
+  @Column({ type: 'datetime', nullable: true, default: null })
   lastLoginAt: Date;
 
-  @Prop({ select: false })
+  @Column({ type: 'varchar', select: false, nullable: true })
   accessPin: string;
-}
 
-export const UserSchema = SchemaFactory.createForClass(User);
+  @BeforeInsert()
+  normalizeAndHash(): Promise<void> {
+    if (this.email) {
+      this.email = this.email.toLowerCase().trim();
+    }
+    if (this.fullName) {
+      this.fullName = this.fullName.trim();
+    }
+    return this.hashPasswordIfPresent();
+  }
 
-User.applyBaseHooks(UserSchema);
-
-UserSchema.pre('save', async function (next) {
-  if (this.isModified('passwordHash')) {
-    try {
+  private async hashPasswordIfPresent(): Promise<void> {
+    if (this.passwordHash) {
       this.passwordHash = await argon2.hash(this.passwordHash);
-    } catch (error) {
-      next(error);
     }
   }
-  next();
-});
-
-UserSchema.pre('findOneAndUpdate', async function (next) {
-  const update = this.getUpdate() as Record<string, any>;
-  const passwordHash = update?.passwordHash ?? update?.$set?.passwordHash;
-
-  if (passwordHash) {
-    const hashedPassword = await argon2.hash(passwordHash);
-    if (update.passwordHash) {
-      update.passwordHash = hashedPassword;
-    }
-    if (update.$set?.passwordHash) {
-      update.$set.passwordHash = hashedPassword;
-    }
-    this.setUpdate(update);
-  }
-
-  next();
-});
-
-UserSchema.index({ fullName: 'text', email: 'text' });
-UserSchema.index({ email: 1 }, { unique: true, name: 'idx_users_email' });
-UserSchema.index({ role: 1 }, { name: 'idx_users_role' });
-UserSchema.index({ teamId: 1 }, { name: 'idx_users_team_id' });
-UserSchema.index({ departmentId: 1 }, { name: 'idx_users_dept_id' });
-UserSchema.index(
-  { subscriptionStatus: 1, accessExpiresAt: 1 },
-  { name: 'idx_users_subscription_lookup' },
-);
-UserSchema.index({ createdAt: 1 }, { name: 'idx_users_created_at' });
+}

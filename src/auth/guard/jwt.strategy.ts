@@ -4,7 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRepository } from '../../users/users.repository';
 import { UserStatus } from '../../users/schema/users.schema';
-import { isValidObjectId } from 'mongoose';
+import { isUUID } from 'class-validator';
 import { RoleRepository } from '../repositories/role.repository';
 import { AUTH_CONSTANTS } from '../constants/auth.constants';
 
@@ -47,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Invalid access token');
     }
 
-    if (!payload.sub || !isValidObjectId(payload.sub)) {
+    if (!payload.sub || !isUUID(payload.sub)) {
       throw new UnauthorizedException('Invalid access token');
     }
 
@@ -69,8 +69,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const role = await this.roleRepository.findById(user.role);
 
     return {
-      id: user._id.toString(),
-      sub: user._id.toString(),
+      id: user.id,
+      sub: user.id,
       email: user.email,
       role: user.role,
       permissions: role?.permissions ?? [],

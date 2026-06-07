@@ -1,36 +1,39 @@
-import { Prop, Schema } from '@nestjs/mongoose';
-import mongoose, { Document, Schema as MongooseSchema } from 'mongoose';
-import { ProductionQueryPlugin } from './plugins/production-query.plugin';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
-@Schema({
-  timestamps: true,
-  toJSON: { getters: true, virtuals: true },
-  toObject: { getters: true, virtuals: true }
-})
-export abstract class Base extends Document {
-  @Prop({ default: true, index: true })
+/**
+ * Abstract base entity shared by all domain tables.
+ * Provides a UUID primary key, soft-delete (deletedAt) and audit columns.
+ * TypeORM automatically excludes soft-deleted rows from queries unless
+ * `withDeleted: true` is passed.
+ */
+export abstract class Base {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @Prop({ default: 'active', index: true })
+  @Column({ type: 'varchar', default: 'active' })
   status: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true })
-  createdBy: mongoose.Schema.Types.ObjectId;
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  createdBy: string | null;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true })
-  updatedBy: mongoose.Schema.Types.ObjectId;
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  updatedBy: string | null;
 
-  @Prop({ default: null, index: true })
-  deletedAt: Date;
-
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
+
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 
-  /**
-   * Applies base query hooks to a schema.
-   * Includes soft-delete and active-only filtering as recommended for production.
-   */
-  static applyBaseHooks(schema: MongooseSchema) {
-    schema.plugin(ProductionQueryPlugin);
-  }
+  @DeleteDateColumn({ type: 'datetime', nullable: true })
+  deletedAt: Date | null;
 }

@@ -1,86 +1,175 @@
-version: '3.8'
+# Deployable stack: NestJS app + PostgreSQL + Redis + MinIO (S3).
+#
+# Quick start:
+#   1. cp .env.example .env   (then fill in SMTP_USER / SMTP_PASS and the JWT secrets)
+#   2. docker compose up -d --build
+#
+# All values below fall back to sensible defaults so the stack boots out of the box,
+# but anything in a root `.env` file (or your shell) overrides them. For a real
+# deployment you MUST set strong JWT secrets and valid SMTP credentials — the app
+# runs a startup connectivity check and will refuse to boot if SMTP is unreachable.
 
 services:
-  # --- MongoDB Database ---
-  mongodb:
-    image: mongo:latest
-    container_name: quiz_app_mongodb
-    restart: always
+  # --- MySQL ---
+  mysql:
+    image: mysql:8.0
+    container_name: nest_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: ${DB_NAME:-nest_template}
     ports:
-      - "27017:27017"
+      - "${DB_PORT:-3306}:3306"
     volumes:
-      - mongodb_data:/data/db
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
-      - quiz_network
+      - app_network
 
-  # --- Redis Cache & BullMQ ---
+  # --- Redis (cache + BullMQ) ---
   redis:
-    image: redis:alpine
-    container_name: quiz_app_redis
-    restart: always
+    image: redis:7-alpine
+    container_name: nest_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-      - quiz_network
+      - app_network
 
-  # --- MinIO S3-Compatible Storage ---
+  # --- MinIO (S3-compatible object storage) ---
   minio:
     image: minio/minio:latest
-    container_name: quiz_app_minio
-    restart: always
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+    container_name: nest_minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
     volumes:
       - minio_data:/data
     networks:
-      - quiz_network
+      - app_network
 
-  # --- NestJS Application ---
+  # --- One-shot job: create the public bucket the app expects ---
+  minio-init:
+    image: minio/mc:latest
+    container_name: nest_minio_init
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      BUCKET: ${AWS_PUBLIC_BUCKET_NAME:-quiz-app}
+    entrypoint: >
+      /bin/sh -c "
+      until /usr/bin/mc alias set local http://minio:9000 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\"; do
+        echo 'waiting for minio...'; sleep 2;
+      done;
+      /usr/bin/mc mb --ignore-existing local/$${BUCKET};
+      /usr/bin/mc anonymous set download local/$${BUCKET};
+      echo 'minio bucket ready';
+      "
+    networks:
+      - app_network
+
+  # --- NestJS application ---
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: quiz_app_backend
-    restart: always
+    container_name: nest_app
+    restart: unless-stopped
     ports:
-      - "8080:8080"
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - DB_URL=mongodb://mongodb:27017/nest_template
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - JWT_SECRET=${JWT_SECRET:-fallback_secret_for_dev_only}
-      - EXPIRES_IN=30d
-      - STAGE=production
-      # Admin seeding (optional, can be passed via .env)
-      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-AdminPassword123!}
-      - ADMIN_ROLE=admin
-      - ADMIN_NAME=Super Admin
+      - "${PORT:-8080}:8080"
     depends_on:
-      - mongodb
-      - redis
-      - minio
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      STAGE: ${STAGE:-production}
+      PORT: 8080
+
+      # Database
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_NAME: ${DB_NAME:-nest_template}
+
+      # JWT — OVERRIDE THESE IN PRODUCTION
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_too_in_production}
+      ACCESS_TOKEN_EXPIRY: ${ACCESS_TOKEN_EXPIRY:-15m}
+      REFRESH_TOKEN_EXPIRY: ${REFRESH_TOKEN_EXPIRY:-30d}
+      EXPIRES_IN: ${EXPIRES_IN:-30d}
+
+      # SMTP — REQUIRED, no default (startup check fails without a reachable SMTP host)
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_IP: redis
+
+      # Object storage (S3 client points at MinIO; AWS_* reuse the MinIO credentials)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_SECRET_NAME: ${AWS_SECRET_NAME:-unused}
+      AWS_PUBLIC_BUCKET_NAME: ${AWS_PUBLIC_BUCKET_NAME:-quiz-app}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+
+      # Initial admin seeding
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminPassword123!}
+      ADMIN_ROLE: ${ADMIN_ROLE:-admin}
+      ADMIN_NAME: ${ADMIN_NAME:-Super Admin}
+      ADMIN_PROFILE_PICTURE: ${ADMIN_PROFILE_PICTURE:-https://example.com/avatar.png}
+      ADMIN_PHONE: ${ADMIN_PHONE:-+10000000000}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-superadmin@example.com}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-SuperAdminPassword123!}
+      SUPER_ADMIN_NAME: ${SUPER_ADMIN_NAME:-Super Admin}
+      SUPER_ADMIN_PHONE: ${SUPER_ADMIN_PHONE:-}
+
+      # Rate limiting
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-10}
+
+      FR_BASE_URL: ${FR_BASE_URL:-http://localhost:3000}
     networks:
-      - quiz_network
+      - app_network
 
 networks:
-  quiz_network:
+  app_network:
     driver: bridge
 
 volumes:
-  mongodb_data:
+  mysql_data:
     driver: local
   redis_data:
     driver: local

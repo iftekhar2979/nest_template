@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Document, Types } from 'mongoose';
 
 type ResponseEnvelope = {
   ok?: boolean;
@@ -136,14 +135,6 @@ export class ResponseInterceptor implements NestInterceptor {
 
     if (value instanceof Date) {
       return value;
-    }
-
-    if (value instanceof Types.ObjectId) {
-      return value.toString();
-    }
-
-    if (value instanceof Document) {
-      return this.serialize(value.toJSON());
     }
 
     if (Array.isArray(value)) {

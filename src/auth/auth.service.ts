@@ -15,7 +15,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import * as argon2 from 'argon2';
 import { createHash, randomInt, randomUUID } from 'crypto';
-import { isValidObjectId, Types } from 'mongoose';
+import { isUUID } from 'class-validator';
 import {
   RegisterDto,
   LoginDto,
@@ -153,13 +153,13 @@ export class AuthService {
   ) {
     try {
       const user = await this.userRepository.findByIdIncludingInactive(
-        this.toObjectId(verificationPayload.sub),
+        this.normalizeUserId(verificationPayload.sub),
       );
       if (!user) {
         throw new UnauthorizedException('Invalid verification request');
       }
 
-      const normalizedUserId = user._id as Types.ObjectId;
+      const normalizedUserId = user.id;
       this.assertAccountCanAuthenticate(user);
 
       if (user.isEmailVerified) {
@@ -218,7 +218,7 @@ export class AuthService {
 
       if (!user.isEmailVerified) {
         await this.refreshTokenRepository.revokeAllByUserId(
-          user._id as Types.ObjectId,
+          user.id,
         );
         await this.issueOtp(user);
         const verificationToken = await this.signEmailVerificationToken(user);
@@ -233,7 +233,7 @@ export class AuthService {
       const role = await this.getRole(user.role);
       const tokens = await this.signTokens(user, role?.permissions ?? []);
       await this.storeRefreshToken(user, tokens.refreshToken, context);
-      await this.userRepository.updateLastLoginAt(user._id as Types.ObjectId);
+      await this.userRepository.updateLastLoginAt(user.id);
 
       return this.buildAuthResponse(user, tokens, role);
     } catch (error) {
@@ -248,7 +248,7 @@ export class AuthService {
     try {
       const oldRefreshToken = refreshTokenDto.refreshToken;
       const payload = this.verifyRefreshToken(oldRefreshToken);
-      const userId = this.toObjectId(payload.sub);
+      const userId = this.normalizeUserId(payload.sub);
       const user = await this.userRepository.findByIdIncludingInactive(userId);
 
       if (!user) {
@@ -272,7 +272,7 @@ export class AuthService {
 
       if (
         !consumedToken ||
-        consumedToken.userId.toString() !== user._id.toString()
+        consumedToken.userId.toString() !== user.id
       ) {
         await this.refreshTokenRepository.revokeAllByUserId(userId);
         throw new UnauthorizedException('Invalid or expired refresh token');
@@ -284,7 +284,7 @@ export class AuthService {
     }
   }
 
-  async logout(refreshToken: string, expectedUserId?: string | Types.ObjectId) {
+  async logout(refreshToken: string, expectedUserId?: string) {
     try {
       const payload = this.verifyRefreshToken(refreshToken);
       if (expectedUserId && payload.sub !== expectedUserId.toString()) {
@@ -306,9 +306,9 @@ export class AuthService {
     }
   }
 
-  async logoutAll(userId: string | Types.ObjectId) {
+  async logoutAll(userId: string) {
     try {
-      const normalizedUserId = this.toObjectId(userId);
+      const normalizedUserId = this.normalizeUserId(userId);
       await this.refreshTokenRepository.revokeAllByUserId(normalizedUserId);
       return { message: 'Logged out from all devices' };
     } catch (error) {
@@ -325,7 +325,7 @@ export class AuthService {
         return {
           message: PASSWORD_RESET_REQUEST_MESSAGE,
           verificationToken: await this.signPasswordResetVerificationToken(
-            new Types.ObjectId().toString(),
+            randomUUID(),
           ),
         };
       }
@@ -335,7 +335,7 @@ export class AuthService {
       return {
         message: PASSWORD_RESET_REQUEST_MESSAGE,
         verificationToken: await this.signPasswordResetVerificationToken(
-          user._id.toString(),
+          user.id,
         ),
       };
     } catch (error) {
@@ -349,14 +349,14 @@ export class AuthService {
   ) {
     try {
       const user = await this.userRepository.findByIdIncludingInactive(
-        this.toObjectId(verificationPayload.sub),
+        this.normalizeUserId(verificationPayload.sub),
       );
       if (!user || !this.canAccountAuthenticate(user)) {
         throw new BadRequestException('Invalid or expired OTP');
       }
 
-      await this.verifyOtpOrThrow(user._id as Types.ObjectId, code);
-      await this.otpRepository.deleteByUserId(user._id as Types.ObjectId);
+      await this.verifyOtpOrThrow(user.id, code);
+      await this.otpRepository.deleteByUserId(user.id);
 
       return {
         resetToken: await this.signPasswordResetToken(user),
@@ -372,19 +372,19 @@ export class AuthService {
         resetPasswordDto.resetToken,
       );
       const user = await this.userRepository.findByIdIncludingInactive(
-        this.toObjectId(payload.sub),
+        this.normalizeUserId(payload.sub),
       );
       if (!user || !this.canAccountAuthenticate(user)) {
         throw new UnauthorizedException('Invalid reset token');
       }
 
-      await this.userRepository.updateById(user._id as Types.ObjectId, {
+      await this.userRepository.updateById(user.id, {
         passwordHash: resetPasswordDto.newPassword,
       });
       await this.refreshTokenRepository.revokeAllByUserId(
-        user._id as Types.ObjectId,
+        user.id,
       );
-      await this.otpRepository.deleteByUserId(user._id as Types.ObjectId);
+      await this.otpRepository.deleteByUserId(user.id);
 
       return { message: PASSWORD_RESET_RESULT_MESSAGE };
     } catch (error) {
@@ -400,7 +400,7 @@ export class AuthService {
     const hashedOtp = await argon2.hash(otpCode);
 
     await this.otpRepository.upsertForUser({
-      userID: user._id as Types.ObjectId,
+      userID: user.id,
       oneTimePassword: hashedOtp,
       expiredAt: expiryDate,
     });
@@ -422,7 +422,7 @@ export class AuthService {
   }
 
   private async verifyOtpOrThrow(
-    userId: Types.ObjectId,
+    userId: string,
     code: string,
   ): Promise<void> {
     const otpRecord = await this.otpRepository.findByUserId(userId);
@@ -451,7 +451,7 @@ export class AuthService {
     }
     if (!isOtpValid) {
       await this.otpRepository.incrementAttempts(
-        otpRecord._id as Types.ObjectId,
+        otpRecord.id,
       );
       throw new BadRequestException('Invalid or expired OTP');
     }
@@ -462,7 +462,7 @@ export class AuthService {
     permissions: string[],
   ): Promise<AuthTokens> {
     const basePayload = {
-      sub: user._id.toString(),
+      sub: user.id,
       email: user.email,
       role: user.role,
       permissions,
@@ -506,7 +506,7 @@ export class AuthService {
     context?: AuthRequestContext,
   ): Promise<void> {
     await this.refreshTokenRepository.create({
-      userId: user._id,
+      userId: user.id,
       tokenHash: this.hashToken(refreshToken),
       expiresAt: this.getRefreshTokenExpiryDate(),
       createdByIp: context?.ip ?? '',
@@ -526,7 +526,7 @@ export class AuthService {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
@@ -566,7 +566,7 @@ export class AuthService {
   private async signEmailVerificationToken(user: User): Promise<string> {
     return this.jwtService.signAsync(
       {
-        sub: user._id.toString(),
+        sub: user.id,
         tokenUse: 'email_verification',
       },
       {
@@ -690,7 +690,7 @@ export class AuthService {
   private async signPasswordResetToken(user: User): Promise<string> {
     return this.jwtService.signAsync(
       {
-        sub: user._id.toString(),
+        sub: user.id,
         tokenUse: 'password_reset',
       },
       {
@@ -767,12 +767,12 @@ export class AuthService {
     return email.toLowerCase().trim();
   }
 
-  private toObjectId(id: string | Types.ObjectId): Types.ObjectId {
+  private normalizeUserId(id: string): string {
     const value = id?.toString();
-    if (!value || !isValidObjectId(value)) {
+    if (!value || !isUUID(value)) {
       throw new BadRequestException('Invalid user id');
     }
-    return new Types.ObjectId(value);
+    return value;
   }
 
   private hashToken(token: string): string {
@@ -935,11 +935,10 @@ export class AuthService {
     }
 
     const dbError = error as {
-      code?: number;
+      code?: string;
       name?: string;
       message?: string;
       stack?: string;
-      keyPattern?: Record<string, unknown>;
     };
 
     this.logger.error(
@@ -947,29 +946,26 @@ export class AuthService {
       dbError?.stack,
     );
 
-    if (dbError?.code === 11000) {
-      if (dbError.keyPattern?.email) {
+    // MySQL unique violation (ER_DUP_ENTRY / errno 1062)
+    if (dbError?.code === 'ER_DUP_ENTRY') {
+      if (dbError.message?.toLowerCase().includes('email')) {
         throw new ConflictException('User with this email already exists');
       }
       throw new ConflictException('Duplicate authentication resource');
     }
 
+    // MySQL connection / availability errors
     if (
       [
-        'MongoNetworkError',
-        // 'MongoNotConnectedError',
-        'MongoServerClosedError',
-        'MongoServerSelectionError',
-        'MongooseServerSelectionError',
-      ].includes(dbError?.name)
+        'ECONNREFUSED',
+        'ETIMEDOUT',
+        'PROTOCOL_CONNECTION_LOST',
+        'ER_CON_COUNT_ERROR',
+      ].includes(dbError?.code)
     ) {
       throw new ServiceUnavailableException(
         'Authentication service is temporarily unavailable',
       );
-    }
-
-    if (['ValidationError', 'CastError'].includes(dbError?.name)) {
-      throw new BadRequestException('Invalid authentication request');
     }
 
     throw new InternalServerErrorException('Authentication request failed');

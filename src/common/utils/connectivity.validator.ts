@@ -1,6 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
-import * as mongoose from 'mongoose';
+import { DataSource } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import { S3Client, ListBucketsCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 import Redis from 'ioredis';
@@ -8,11 +8,11 @@ import Redis from 'ioredis';
 export class ConnectivityValidator {
   private static readonly logger = new Logger('ConnectivityValidator');
 
-  static async validate(configService: ConfigService) {
+  static async validate(configService: ConfigService, dataSource: DataSource) {
     this.logger.log('Starting connectivity validation...');
 
     await Promise.all([
-      this.checkDatabase(configService),
+      this.checkDatabase(dataSource),
       this.checkS3(configService),
       this.checkSMTP(configService),
       this.checkRedis(configService),
@@ -21,25 +21,14 @@ export class ConnectivityValidator {
     this.logger.log('All connectivity checks passed successfully!');
   }
 
-  private static async checkDatabase(configService: ConfigService) {
-    const dbUrl = configService.get<string>('DB_URL');
-    let connection: mongoose.Connection | null = null;
-
+  private static async checkDatabase(dataSource: DataSource) {
     try {
       this.logger.log('Checking Database connection...');
-      connection = await mongoose.createConnection(dbUrl, {
-        serverSelectionTimeoutMS: 5000,
-      }).asPromise();
-
-      await connection.db.admin().ping();
+      await dataSource.query('SELECT 1');
       this.logger.log('Database connection successful.');
     } catch (error) {
       this.logger.error(`Database connection failed: ${error.message}`);
       throw new Error(`DATABASE_CONNECTION_ERROR: ${error.message}`);
-    } finally {
-      if (connection) {
-        await connection.close();
-      }
     }
   }
 

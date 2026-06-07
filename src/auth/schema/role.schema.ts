@@ -1,19 +1,14 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Column, Entity, PrimaryColumn } from 'typeorm';
 import { RoleType } from '../../users/schema/users.schema';
 
-@Schema({ collection: 'roles', timestamps: false })
-export class Role extends Document {
-  @Prop({ required: true, enum: RoleType, trim: true })
+@Entity('roles')
+export class Role {
+  @PrimaryColumn({ type: 'enum', enum: RoleType })
   id: RoleType;
 
-  @Prop({ type: [String], default: [] })
+  @Column({ type: 'simple-array' })
   permissions: string[];
 
-  @Prop({ default: '' })
+  @Column({ type: 'varchar', default: '' })
   description: string;
 }
-
-export const RoleSchema = SchemaFactory.createForClass(Role);
-
-RoleSchema.index({ id: 1 }, { unique: true, name: 'idx_roles_id' });
