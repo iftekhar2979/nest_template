@@ -10,10 +10,15 @@ import { Employee } from './schema/employee.schema';
 import {
   BiometricEnrollDto,
   EnrollEmployeeDto,
+  EmployeeSortBy,
+  QueryEmployeeDto,
+  SortOrder,
   UpdateEmployeeDto,
 } from './dto/employee.dto';
 import { UserService } from '../users/users.service';
 import { RoleType, User } from '../users/schema/users.schema';
+import { pagination } from '../common/pagination/pagination';
+import { IPagination } from '../common/pagination/pagination.interface';
 
 type EmployeeNameParts = {
   firstName: string;
@@ -103,8 +108,58 @@ export class EmployeesService {
     );
   }
 
-  findAll(): Promise<Employee[]> {
-    return this.employeeRepo.find({ order: { createdAt: 'DESC' } });
+  async findAll(
+    query: QueryEmployeeDto,
+  ): Promise<{ data: Employee[]; pagination: IPagination }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? EmployeeSortBy.CREATED_AT;
+    const sortOrder = query.sortOrder ?? SortOrder.DESC;
+
+    const qb = this.employeeRepo.createQueryBuilder('employee');
+
+    if (query.search) {
+      qb.andWhere(
+        '(employee.employeeName LIKE :search OR employee.employeeCode LIKE :search OR employee.companyEmail LIKE :search)',
+        { search: `%${query.search}%` },
+      );
+    }
+    if (query.companyId) {
+      qb.andWhere('employee.companyId = :companyId', {
+        companyId: query.companyId,
+      });
+    }
+    if (query.branchId) {
+      qb.andWhere('employee.branchId = :branchId', { branchId: query.branchId });
+    }
+    if (query.departmentId) {
+      qb.andWhere('employee.departmentId = :departmentId', {
+        departmentId: query.departmentId,
+      });
+    }
+    if (query.designationId) {
+      qb.andWhere('employee.designationId = :designationId', {
+        designationId: query.designationId,
+      });
+    }
+    if (query.employeeStatus) {
+      qb.andWhere('employee.employeeStatus = :employeeStatus', {
+        employeeStatus: query.employeeStatus,
+      });
+    }
+    if (query.employmentType) {
+      qb.andWhere('employee.employmentType = :employmentType', {
+        employmentType: query.employmentType,
+      });
+    }
+
+    // sortBy is constrained by the EmployeeSortBy enum, so the column is safe
+    qb.orderBy(`employee.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, pagination: pagination(limit, page, total) };
   }
 
   async findOne(id: string): Promise<Employee> {

@@ -47,7 +47,7 @@ type AuthenticatedRequest = Request & {
 
 @ApiTags('Authentication')
 @Controller('auth')
-@UseGuards(AuthRateLimitGuard, ThrottlerBehindProxyGuard)
+@UseGuards( ThrottlerBehindProxyGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

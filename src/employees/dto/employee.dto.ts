@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsDateString,
@@ -21,6 +21,7 @@ import {
   MaritalStatus,
   SalaryMode,
 } from '../schema/employee.schema';
+import { PaginationDto } from '../../shared/dto/pagination.dto';
 
 export class EnrollEmployeeDto {
   // --- Login / personal ---
@@ -556,4 +557,74 @@ export class EmployeeResponseDto extends EnrollEmployeeDto {
 export class EmployeeDeleteResponseDto {
   @ApiProperty({ example: 'Employee deleted successfully' })
   message: string;
+}
+
+export enum EmployeeSortBy {
+  CREATED_AT = 'createdAt',
+  EMPLOYEE_NAME = 'employeeName',
+  EMPLOYEE_CODE = 'employeeCode',
+  JOINING_DATE = 'joiningDate',
+}
+
+export enum SortOrder {
+  ASC = 'ASC',
+  DESC = 'DESC',
+}
+
+export class QueryEmployeeDto extends PaginationDto {
+  @ApiPropertyOptional({
+    description: 'Free-text search on employee name, code, or company email',
+    example: 'jane',
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by company UUID' })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by branch UUID' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by department UUID' })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by designation UUID' })
+  @IsOptional()
+  @IsUUID()
+  designationId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by employee status', enum: EmployeeStatus })
+  @IsOptional()
+  @IsEnum(EmployeeStatus)
+  employeeStatus?: EmployeeStatus;
+
+  @ApiPropertyOptional({ description: 'Filter by employment type', enum: EmploymentType })
+  @IsOptional()
+  @IsEnum(EmploymentType)
+  employmentType?: EmploymentType;
+
+  @ApiPropertyOptional({
+    description: 'Sort field',
+    enum: EmployeeSortBy,
+    default: EmployeeSortBy.CREATED_AT,
+  })
+  @IsOptional()
+  @IsEnum(EmployeeSortBy)
+  sortBy?: EmployeeSortBy;
+
+  @ApiPropertyOptional({
+    description: 'Sort order',
+    enum: SortOrder,
+    default: SortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

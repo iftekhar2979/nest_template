@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
   HttpStatus,
@@ -28,6 +29,7 @@ import {
   UpdateEmployeeDto,
   EmployeeResponseDto,
   EmployeeDeleteResponseDto,
+  QueryEmployeeDto,
 } from './dto/employee.dto';
 
 @ApiTags('Employees')
@@ -71,14 +73,18 @@ export class EmployeesController {
 
   @Get()
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
-  @ApiOperation({ summary: 'Get all employees' })
+  @ApiOperation({
+    summary:
+      'List employees with pagination and filtering (search, company, branch, department, designation, status, type)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all employees retrieved successfully.',
+    description:
+      'Paginated list of employees: { data: EmployeeResponseDto[], pagination }.',
     type: [EmployeeResponseDto],
   })
-  findAll() {
-    return this.employeesService.findAll();
+  findAll(@Query() query: QueryEmployeeDto) {
+    return this.employeesService.findAll(query);
   }
 
   @Get(':id')
