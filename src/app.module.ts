@@ -17,6 +17,12 @@ import { WinstonModule } from 'nest-winston';
 import { winstonLoggerConfig } from './common/configs/winston.config';
 import { EmailVerificationTokensModule } from './email_verification_tokens/email_verification_tokens.module';
 import { RefreshTokensModule } from './refresh_tokens/refresh_tokens.module';
+import { DepartmentsModule } from './departments/departments.module';
+import { DesignationsModule } from './designations/designations.module';
+import { ShiftsModule } from './shifts/shifts.module';
+import { HolidaysModule } from './holidays/holidays.module';
+import { AttendanceModule } from './attendance/attendance.module';
+import { EmployeesModule } from './employees/employees.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -65,6 +71,12 @@ import { ThrottlerModule } from '@nestjs/throttler';
     
     EmailVerificationTokensModule,
     RefreshTokensModule,
+    DepartmentsModule,
+    DesignationsModule,
+    ShiftsModule,
+    HolidaysModule,
+    AttendanceModule,
+    EmployeesModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

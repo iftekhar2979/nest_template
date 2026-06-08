@@ -1,5 +1,5 @@
 {
-  "name": "vibely",
+  "name": "IlmifyTech Humon Resource Management",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -34,6 +34,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.13",
+    "@nestjs/schedule": "^4.1.2",
     "@nestjs/serve-static": "^4.0.2",
     "@nestjs/swagger": "^8.1.1",
     "@nestjs/terminus": "^11.1.1",

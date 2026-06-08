@@ -11,6 +11,7 @@ export enum RoleType {
   SALES_MEMBER = 'sales_member',
   OPERATION_LEADER = 'operation_leader',
   OPERATION_MEMBER = 'operation_member',
+  EMPLOYEE = 'employee',
   CLIENT = 'client',
 }
 
@@ -75,9 +76,6 @@ export class User extends Base {
 
   @Column({ type: 'datetime', nullable: true, default: null })
   lastLoginAt: Date;
-
-  @Column({ type: 'varchar', select: false, nullable: true })
-  accessPin: string;
 
   @BeforeInsert()
   normalizeAndHash(): Promise<void> {

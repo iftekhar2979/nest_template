@@ -14,7 +14,9 @@ export class UserService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    return this.userRepo.save(this.userRepo.create(createUserDto as Partial<User>));
+    return this.userRepo.save(
+      this.userRepo.create(createUserDto as Partial<User>),
+    );
   }
 
   async createUser(user): Promise<User> {
@@ -27,7 +29,9 @@ export class UserService {
   }
 
   async checkUserExistWiththeName(createUserDto: CreateUserDto): Promise<User> {
-    return this.userRepo.findOne({ where: { fullName: createUserDto.fullName } });
+    return this.userRepo.findOne({
+      where: { fullName: createUserDto.fullName },
+    });
   }
 
   async checkUserExistWiththeEmail(
@@ -87,6 +91,8 @@ export class UserService {
       'subscriptionStatus',
       'accessExpiresAt',
       'lastLoginAt',
+      'departmentId',
+      'teamId',
     ];
 
     for (const field of protectedFields) {
@@ -94,6 +100,14 @@ export class UserService {
     }
 
     await this.userRepo.update({ id }, updateUserDto);
+    return this.userRepo.findOne({ where: { id } });
+  }
+
+  async syncEmployeeMetadata(
+    id: string,
+    data: Pick<Partial<User>, 'departmentId' | 'fullName' | 'phoneNumber'>,
+  ): Promise<User> {
+    await this.userRepo.update({ id }, data);
     return this.userRepo.findOne({ where: { id } });
   }
 

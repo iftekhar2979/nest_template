@@ -51,6 +51,9 @@ export const envSchema = Joi.object({
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(10),
 
+  // Shared secret for biometric/device punch ingestion (x-device-api-key header)
+  DEVICE_API_KEY: Joi.string().optional(),
+
   GOOGLE_CLIENT_ID: Joi.string().optional(),
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
 

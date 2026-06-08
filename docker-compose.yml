@@ -160,6 +160,9 @@ services:
       THROTTLE_TTL: ${THROTTLE_TTL:-60}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-10}
 
+      # Attendance device/biometric punch ingestion
+      DEVICE_API_KEY: ${DEVICE_API_KEY:-change_me_device_key}
+
       FR_BASE_URL: ${FR_BASE_URL:-http://localhost:3000}
     networks:
       - app_network

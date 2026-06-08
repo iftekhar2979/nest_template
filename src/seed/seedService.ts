@@ -29,7 +29,16 @@ export class SeederService {
       },
       {
         id: RoleType.ADMIN,
-        permissions: ['read:*', 'write:*', 'manage:users'],
+        permissions: [
+          'read:*',
+          'write:*',
+          'manage:users',
+          'manage:departments',
+          'manage:designations',
+          'manage:shifts',
+          'manage:attendance',
+          'manage:holidays',
+        ],
         description: 'Administrative access across operational modules',
       },
       {
@@ -61,6 +70,18 @@ export class SeederService {
         id: RoleType.OPERATION_MEMBER,
         permissions: ['read:operations', 'write:operations'],
         description: 'Operations member access',
+      },
+      {
+        id: RoleType.EMPLOYEE,
+        permissions: [
+          'read:own_profile',
+          'write:own_profile',
+          'read:own_attendance',
+          'write:own_attendance',
+          'write:own_requests',
+          'read:own_requests',
+        ],
+        description: 'Employee self-service attendance access',
       },
       {
         id: RoleType.CLIENT,

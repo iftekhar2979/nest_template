@@ -121,6 +121,16 @@ async function bootstrap() {
       .setVersion(configService.get<string>("npm_package_version"))
       .build();
 
+    // Swagger UI inlines the spec into swagger-ui-init.js. That .js asset is
+    // edge-cached by CDNs (e.g. Cloudflare) by extension, which serves a stale
+    // spec through tunnels/proxies. Mark the spec-bearing routes non-cacheable.
+    app.use((req, res, next) => {
+      if (["/api", "/api-json", "/api-yaml", "/api/swagger-ui-init.js"].includes(req.path)) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      }
+      next();
+    });
+
     const document = SwaggerModule.createDocument(app, config, { ignoreGlobalPrefix: false });
     SwaggerModule.setup("api", app, document, {
       swaggerOptions: {

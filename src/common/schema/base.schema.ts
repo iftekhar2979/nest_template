@@ -2,9 +2,12 @@ import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  JoinColumn,
+  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { User } from '../../users/schema/users.schema';
 
 /**
  * Abstract base entity shared by all domain tables.
@@ -22,12 +25,6 @@ export abstract class Base {
   @Column({ type: 'varchar', default: 'active' })
   status: string;
 
-  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
-  createdBy: string | null;
-
-  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
-  updatedBy: string | null;
-
   @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
 
@@ -36,4 +33,22 @@ export abstract class Base {
 
   @DeleteDateColumn({ type: 'datetime', nullable: true })
   deletedAt: Date | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string | null;
+
+  // Relations backed by the createdBy/updatedBy FK columns above, so the
+  // creating/updating user can be eagerly joined (relations: ['createdByUser']).
+  // String target + `import type` avoids the circular import with User (which
+  // itself extends Base).
+  @ManyToOne('User', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'createdBy' })
+  createdByUser?: User | null;
+
+  @ManyToOne('User', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'updatedBy' })
+  updatedByUser?: User | null;
 }
