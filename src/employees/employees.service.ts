@@ -19,6 +19,7 @@ import { UserService } from '../users/users.service';
 import { RoleType, User } from '../users/schema/users.schema';
 import { pagination } from '../common/pagination/pagination';
 import { IPagination } from '../common/pagination/pagination.interface';
+import { WorkweeksService } from '../workweeks/workweeks.service';
 
 type EmployeeNameParts = {
   firstName: string;
@@ -33,6 +34,7 @@ export class EmployeesService {
     @InjectRepository(Employee)
     private readonly employeeRepo: Repository<Employee>,
     private readonly userService: UserService,
+    private readonly workweeksService: WorkweeksService,
   ) {}
 
   /**
@@ -56,7 +58,6 @@ export class EmployeesService {
       throw new ConflictException('Employee code already exists');
     }
     await this.ensureAttendanceDeviceIdAvailable(dto.attendanceDeviceId);
-
     const user = await this.userService.createUser({
       email: dto.email,
       fullName: name.employeeName,
@@ -116,7 +117,11 @@ export class EmployeesService {
     const sortBy = query.sortBy ?? EmployeeSortBy.CREATED_AT;
     const sortOrder = query.sortOrder ?? SortOrder.DESC;
 
-    const qb = this.employeeRepo.createQueryBuilder('employee');
+    const qb = this.employeeRepo
+      .createQueryBuilder('employee')
+      .leftJoinAndSelect('employee.department', 'department')
+      .leftJoinAndSelect('employee.designation', 'designation')
+      .leftJoinAndSelect('employee.defaultShift', 'defaultShift');
 
     if (query.search) {
       qb.andWhere(
@@ -152,6 +157,29 @@ export class EmployeesService {
         employmentType: query.employmentType,
       });
     }
+    if (query.reportsToEmployeeId) {
+      qb.andWhere('employee.reportsToEmployeeId = :reportsToEmployeeId', {
+        reportsToEmployeeId: query.reportsToEmployeeId,
+      });
+    }
+    if (query.gradeId) {
+      qb.andWhere('employee.gradeId = :gradeId', { gradeId: query.gradeId });
+    }
+    if (query.defaultShiftId) {
+      qb.andWhere('employee.defaultShiftId = :defaultShiftId', {
+        defaultShiftId: query.defaultShiftId,
+      });
+    }
+    if (query.joinedFrom) {
+      qb.andWhere('employee.joiningDate >= :joinedFrom', {
+        joinedFrom: query.joinedFrom,
+      });
+    }
+    if (query.joinedTo) {
+      qb.andWhere('employee.joiningDate <= :joinedTo', {
+        joinedTo: query.joinedTo,
+      });
+    }
 
     // sortBy is constrained by the EmployeeSortBy enum, so the column is safe
     qb.orderBy(`employee.${sortBy}`, sortOrder)
@@ -159,6 +187,17 @@ export class EmployeesService {
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
+
+    // Attach each employee's currently-active work-week pattern (weekday info).
+    const today = new Date().toISOString().slice(0, 10);
+    const patternByUser = await this.workweeksService.resolveActivePatternsForUsers(
+      data.map((employee) => employee.userId),
+      today,
+    );
+    for (const employee of data) {
+      employee.workWeekPattern = patternByUser.get(employee.userId) ?? null;
+    }
+
     return { data, pagination: pagination(limit, page, total) };
   }
 

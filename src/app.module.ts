@@ -25,6 +25,7 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { EmployeesModule } from './employees/employees.module';
 import { CompanyModule } from './company/company.module';
 import { BranchModule } from './branch/branch.module';
+import { LeaveModule } from './leave/leave.module';
 import { WorkweeksModule } from './workweeks/workweeks.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -81,6 +82,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     EmployeesModule,
     CompanyModule,
     BranchModule,
+    LeaveModule,
     WorkweeksModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],

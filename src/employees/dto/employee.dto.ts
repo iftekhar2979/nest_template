@@ -610,6 +610,31 @@ export class QueryEmployeeDto extends PaginationDto {
   @IsEnum(EmploymentType)
   employmentType?: EmploymentType;
 
+  @ApiPropertyOptional({ description: 'Filter by reporting manager employee UUID' })
+  @IsOptional()
+  @IsUUID()
+  reportsToEmployeeId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by grade UUID' })
+  @IsOptional()
+  @IsUUID()
+  gradeId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by default shift UUID' })
+  @IsOptional()
+  @IsUUID()
+  defaultShiftId?: string;
+
+  @ApiPropertyOptional({ description: 'Joined on/after this date (YYYY-MM-DD)', example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  joinedFrom?: string;
+
+  @ApiPropertyOptional({ description: 'Joined on/before this date (YYYY-MM-DD)', example: '2024-12-31' })
+  @IsOptional()
+  @IsDateString()
+  joinedTo?: string;
+
   @ApiPropertyOptional({
     description: 'Sort field',
     enum: EmployeeSortBy,

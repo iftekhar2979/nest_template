@@ -2,6 +2,10 @@ import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
 import { Company } from '../../company/schema/company.schema';
 import { Branch } from '../../branch/schema/branch.schema';
+import { Shift } from '../../shifts/schema/shift.schema';
+import { Department } from '../../departments/schema/department.schema';
+import { Designation } from '../../designations/schema/designation.schema';
+import { WorkWeekPattern } from '../../workweeks/schema/work-week-pattern.schema';
 
 export enum EmploymentType {
   PROBATION = 'probation',
@@ -116,8 +120,18 @@ export class Employee extends Base {
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   departmentId: string;
 
+  // Joinable relation backed by departmentId (employees:department = many:one)
+  @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'departmentId' })
+  department?: Department | null;
+
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   designationId: string;
+
+  // Joinable relation backed by designationId (employees:designation = many:one)
+  @ManyToOne(() => Designation, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'designationId' })
+  designation?: Designation | null;
 
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   reportsToEmployeeId: string;
@@ -164,6 +178,13 @@ export class Employee extends Base {
 
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   defaultShiftId: string;
+
+  // Joinable relation backed by defaultShiftId. This is only the *fallback*
+  // shift; rotating/temporary shifts are modelled per-date in ShiftAssignment
+  // and resolved via ShiftsService.resolveShiftForUser().
+  @ManyToOne(() => Shift, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'defaultShiftId' })
+  defaultShift?: Shift | null;
 
   @Column({ type: 'varchar', nullable: true, default: null })
   holidayListId: string;
@@ -324,4 +345,7 @@ export class Employee extends Base {
 
   @Column({ type: 'datetime', nullable: true, default: null })
   biometricEnrolledAt: Date;
+
+  // Transient: currently-active work-week pattern (resolved per request, not persisted)
+  workWeekPattern?: WorkWeekPattern | null;
 }

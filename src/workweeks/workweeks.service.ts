@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Employee } from '../employees/schema/employee.schema';
 import {
   AssignWorkWeekPatternDto,
@@ -268,6 +268,57 @@ export class WorkweeksService {
       assignment,
       pattern,
     };
+  }
+
+  /**
+   * Batch-resolve the active work-week pattern for many users on a given date.
+   * Returns a map keyed by userId (null when a user has no active assignment).
+   * Used by list endpoints to avoid N+1 lookups.
+   */
+  async resolveActivePatternsForUsers(
+    userIds: string[],
+    date: string,
+  ): Promise<Map<string, WorkWeekPattern | null>> {
+    const result = new Map<string, WorkWeekPattern | null>();
+    userIds.forEach((id) => result.set(id, null));
+    if (userIds.length === 0) {
+      return result;
+    }
+
+    const assignments = await this.assignmentRepo
+      .createQueryBuilder('a')
+      .where('a.userId IN (:...userIds)', { userIds })
+      .andWhere('a.effectiveFrom <= :date', { date })
+      .andWhere('(a.effectiveTo IS NULL OR a.effectiveTo >= :date)', { date })
+      .orderBy('a.effectiveFrom', 'DESC')
+      .getMany();
+
+    // First (most recent effectiveFrom) wins per user.
+    const activeByUser = new Map<string, EmployeeWorkWeekAssignment>();
+    for (const assignment of assignments) {
+      if (!activeByUser.has(assignment.userId)) {
+        activeByUser.set(assignment.userId, assignment);
+      }
+    }
+
+    const patternIds = [
+      ...new Set(
+        [...activeByUser.values()].map((a) => a.workWeekPatternId),
+      ),
+    ];
+    if (patternIds.length === 0) {
+      return result;
+    }
+
+    const patterns = await this.patternRepo.find({
+      where: { id: In(patternIds) },
+    });
+    const patternById = new Map(patterns.map((p) => [p.id, p]));
+
+    for (const [userId, assignment] of activeByUser) {
+      result.set(userId, patternById.get(assignment.workWeekPatternId) ?? null);
+    }
+    return result;
   }
 
   private async resolveAssignment(

@@ -68,6 +68,7 @@ export class EmployeesController {
   @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Email or employee code already exists.' })
   @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Insufficient permissions.' })
   enroll(@Body() dto: EnrollEmployeeDto, @Request() req: any) {
+    console.log(dto)
     return this.employeesService.enroll(dto, req.user?.id);
   }
 

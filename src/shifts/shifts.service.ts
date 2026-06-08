@@ -195,11 +195,11 @@ export class ShiftsService {
     if (uniqueUserIds.length === 0) {
       throw new BadRequestException('At least one userId is required');
     }
-
     const employees = await this.employeeRepo.find({
       where: { userId: In(uniqueUserIds) },
       select: ['userId'],
     });
+    console.log(employees)
     const foundUserIds = new Set(employees.map((employee) => employee.userId));
     const missing = uniqueUserIds.filter((userId) => !foundUserIds.has(userId));
     if (missing.length > 0) {
