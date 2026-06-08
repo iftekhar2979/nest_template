@@ -9,14 +9,30 @@ import {
   Query,
   Request,
   UseGuards,
+  HttpStatus,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RoleType } from 'src/users/schema/users.schema';
 import { HolidaysService } from './holidays.service';
-import { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
+import {
+  CreateHolidayDto,
+  UpdateHolidayDto,
+  HolidayResponseDto,
+  HolidayDeleteResponseDto,
+} from './dto/holiday.dto';
 
+@ApiTags('Holidays')
+@ApiBearerAuth()
 @Controller('holidays')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class HolidaysController {
@@ -24,6 +40,14 @@ export class HolidaysController {
 
   @Post()
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @ApiOperation({ summary: 'Create a new holiday' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'The holiday has been successfully created.',
+    type: HolidayResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data.' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Insufficient permissions.' })
   create(@Body() dto: CreateHolidayDto, @Request() req: any) {
     return this.holidaysService.create(dto, req.user?.id);
   }
@@ -31,18 +55,46 @@ export class HolidaysController {
   // Any authenticated user can view the holiday calendar
   @Get()
   @Roles(...Object.values(RoleType))
+  @ApiOperation({ summary: 'Get all holidays' })
+  @ApiQuery({
+    name: 'region',
+    description: 'Filter holidays by region (e.g., "global", "New York")',
+    required: false,
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'List of all holidays retrieved successfully.',
+    type: [HolidayResponseDto],
+  })
   findAll(@Query('region') region?: string) {
     return this.holidaysService.findAll(region);
   }
 
   @Get(':id')
   @Roles(...Object.values(RoleType))
+  @ApiOperation({ summary: 'Get a holiday by ID' })
+  @ApiParam({ name: 'id', description: 'Holiday UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The holiday has been successfully retrieved.',
+    type: HolidayResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Holiday not found.' })
   findOne(@Param('id') id: string) {
     return this.holidaysService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @ApiOperation({ summary: 'Update a holiday' })
+  @ApiParam({ name: 'id', description: 'Holiday UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The holiday has been successfully updated.',
+    type: HolidayResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Holiday not found.' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid input data.' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateHolidayDto,
@@ -53,6 +105,14 @@ export class HolidaysController {
 
   @Delete(':id')
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @ApiOperation({ summary: 'Delete a holiday' })
+  @ApiParam({ name: 'id', description: 'Holiday UUID' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'The holiday has been successfully deleted.',
+    type: HolidayDeleteResponseDto,
+  })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Holiday not found.' })
   remove(@Param('id') id: string) {
     return this.holidaysService.remove(id);
   }
