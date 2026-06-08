@@ -23,6 +23,8 @@ import { ShiftsModule } from './shifts/shifts.module';
 import { HolidaysModule } from './holidays/holidays.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { EmployeesModule } from './employees/employees.module';
+import { CompanyModule } from './company/company.module';
+import { BranchModule } from './branch/branch.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -77,6 +79,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
     HolidaysModule,
     AttendanceModule,
     EmployeesModule,
+    CompanyModule,
+    BranchModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

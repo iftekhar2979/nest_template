@@ -1,5 +1,7 @@
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
+import { Company } from '../../company/schema/company.schema';
+import { Branch } from '../../branch/schema/branch.schema';
 
 export enum EmploymentType {
   PROBATION = 'probation',
@@ -106,6 +108,11 @@ export class Employee extends Base {
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   companyId: string;
 
+  // Joinable relation backed by companyId (employees:company = many:one)
+  @ManyToOne(() => Company, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'companyId' })
+  company?: Company | null;
+
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   departmentId: string;
 
@@ -117,6 +124,11 @@ export class Employee extends Base {
 
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   branchId: string;
+
+  // Joinable relation backed by branchId (employees:branch = many:one)
+  @ManyToOne(() => Branch, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'branchId' })
+  branch?: Branch | null;
 
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   gradeId: string;
