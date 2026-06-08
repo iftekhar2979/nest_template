@@ -3,7 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_FILTER, } from '@nestjs/core';
+import { APP_FILTER } from '@nestjs/core';
 import { ValidationExceptionFilter } from './common/filters/validationError';
 import { AuthModule } from './auth/auth.module';
 import { EmailserviceModule } from './emailservice/emailservice.module';
@@ -25,9 +25,9 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { EmployeesModule } from './employees/employees.module';
 import { CompanyModule } from './company/company.module';
 import { BranchModule } from './branch/branch.module';
+import { WorkweeksModule } from './workweeks/workweeks.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
-
 
 @Module({
   imports: [
@@ -65,12 +65,12 @@ import { ThrottlerModule } from '@nestjs/throttler';
     UsersModule,
     AuthModule,
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),  // Serve from the 'public' directory
+      rootPath: join(__dirname, '..', 'public'), // Serve from the 'public' directory
     }),
     EmailserviceModule,
     SeedModule,
     SettingsModule,
-    
+
     EmailVerificationTokensModule,
     RefreshTokensModule,
     DepartmentsModule,
@@ -81,6 +81,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     EmployeesModule,
     CompanyModule,
     BranchModule,
+    WorkweeksModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

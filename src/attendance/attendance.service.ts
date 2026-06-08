@@ -5,6 +5,7 @@ import { Employee } from '../employees/schema/employee.schema';
 import { HolidaysService } from '../holidays/holidays.service';
 import { Shift } from '../shifts/schema/shift.schema';
 import { ShiftsService } from '../shifts/shifts.service';
+import { WorkweeksService } from '../workweeks/workweeks.service';
 import {
   AttendanceRecord,
   AttendanceSource,
@@ -42,6 +43,7 @@ export class AttendanceService {
     private readonly employeeRepo: Repository<Employee>,
     private readonly shiftsService: ShiftsService,
     private readonly holidaysService: HolidaysService,
+    private readonly workweeksService: WorkweeksService,
   ) {}
 
   // --- Punch ingestion (device-agnostic) ---
@@ -265,7 +267,7 @@ export class AttendanceService {
     remarks?: string;
     actorId?: string;
   }): Promise<AttendanceRecord> {
-    const shift = await this.shiftsService.resolveShiftForUser(
+    const shift = await this.resolveShiftForAttendance(
       params.userId,
       params.date,
     );
@@ -343,7 +345,7 @@ export class AttendanceService {
     const checkInAt = ins.length ? ins[0].punchedAt : null;
     const checkOutAt = outs.length ? outs[outs.length - 1].punchedAt : null;
 
-    const shift = await this.shiftsService.resolveShiftForUser(userId, date);
+    const shift = await this.resolveShiftForAttendance(userId, date);
     const metrics = this.computeMetrics(date, checkInAt, checkOutAt, shift);
     const derivedStatus = await this.resolveDerivedStatusForDay(
       userId,
@@ -482,7 +484,37 @@ export class AttendanceService {
       employee?.holidayListId,
       region,
     );
-    return isHoliday ? AttendanceStatus.HOLIDAY : baseStatus;
+    if (isHoliday) {
+      return AttendanceStatus.HOLIDAY;
+    }
+
+    const workDay = await this.workweeksService.resolveWorkDayForUser(
+      userId,
+      date,
+    );
+    return workDay.isWeeklyOff ? AttendanceStatus.WEEKLY_OFF : baseStatus;
+  }
+
+  private async resolveShiftForAttendance(
+    userId: string,
+    date: string,
+  ): Promise<Shift | null> {
+    const assignedShift = await this.shiftsService.resolveShiftForUser(
+      userId,
+      date,
+    );
+    if (assignedShift) {
+      return assignedShift;
+    }
+
+    const workDay = await this.workweeksService.resolveWorkDayForUser(
+      userId,
+      date,
+    );
+    if (!workDay.pattern?.defaultShiftId) {
+      return null;
+    }
+    return this.shiftsService.findOne(workDay.pattern.defaultShiftId);
   }
 
   private toDateString(value: Date): string {
