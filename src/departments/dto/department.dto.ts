@@ -40,15 +40,6 @@ export class CreateDepartmentDto {
   isGroup?: boolean;
 
   @ApiProperty({
-    description: 'UUID of the company this department belongs to',
-    example: '550e8400-e29b-41d4-a716-446655440001',
-    required: false,
-  })
-  @IsOptional()
-  @IsUUID()
-  company?: string;
-
-  @ApiProperty({
     description: 'Whether the department is disabled',
     example: false,
     required: false,

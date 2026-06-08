@@ -28,16 +28,6 @@ export class Department extends Base {
   @Column({ name: 'is_group', type: 'boolean', default: false })
   isGroup: boolean;
 
-  // Link -> Company
-  @Column({
-    name: 'company',
-    type: 'varchar',
-    length: 36,
-    nullable: true,
-    default: null,
-  })
-  company: string | null;
-
   // Check
   @Column({ name: 'disabled', type: 'boolean', default: false })
   disabled: boolean;
