@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsArray,
   ArrayMinSize,
@@ -14,6 +14,11 @@ import {
   MinLength,
 } from 'class-validator';
 import { ShiftType } from '../schema/shift.schema';
+import {
+  PaginationDto,
+  SortOrder,
+  ToBoolean,
+} from '../../shared/dto/pagination.dto';
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -166,4 +171,37 @@ export class ShiftDeleteResponseDto {
 export class ShiftAssignmentDeleteResponseDto {
   @ApiProperty({ example: 'Shift assignment removed successfully' })
   message: string;
+}
+
+export enum ShiftSortBy {
+  NAME = 'name',
+  CREATED_AT = 'createdAt',
+}
+
+export class QueryShiftDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Search by shift name', example: 'morning' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by shift type', enum: ShiftType })
+  @IsOptional()
+  @IsEnum(ShiftType)
+  type?: ShiftType;
+
+  @ApiPropertyOptional({ description: 'Filter by overnight flag' })
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
+  isOvernight?: boolean;
+
+  @ApiPropertyOptional({ enum: ShiftSortBy, default: ShiftSortBy.NAME })
+  @IsOptional()
+  @IsEnum(ShiftSortBy)
+  sortBy?: ShiftSortBy;
+
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.ASC })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

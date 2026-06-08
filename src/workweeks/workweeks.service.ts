@@ -13,8 +13,13 @@ import {
   CreateDayOverrideDto,
   CreateWeekdaySwapDto,
   CreateWorkWeekPatternDto,
+  QueryWorkWeekPatternDto,
   UpdateWorkWeekPatternDto,
+  WorkWeekPatternSortBy,
 } from './dto/work-week.dto';
+import { pagination } from '../common/pagination/pagination';
+import { IPagination } from '../common/pagination/pagination.interface';
+import { SortOrder } from '../shared/dto/pagination.dto';
 import {
   DayOverrideType,
   EmployeeDayOverride,
@@ -58,8 +63,31 @@ export class WorkweeksService {
     );
   }
 
-  findPatterns(): Promise<WorkWeekPattern[]> {
-    return this.patternRepo.find({ order: { name: 'ASC' } });
+  async findPatterns(
+    query: QueryWorkWeekPatternDto,
+  ): Promise<{ data: WorkWeekPattern[]; pagination: IPagination }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? WorkWeekPatternSortBy.NAME;
+    const sortOrder = query.sortOrder ?? SortOrder.ASC;
+
+    const qb = this.patternRepo.createQueryBuilder('pattern');
+
+    if (query.search) {
+      qb.andWhere('pattern.name LIKE :search', { search: `%${query.search}%` });
+    }
+    if (query.companyId) {
+      qb.andWhere('pattern.companyId = :companyId', {
+        companyId: query.companyId,
+      });
+    }
+
+    qb.orderBy(`pattern.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, pagination: pagination(limit, page, total) };
   }
 
   async findPattern(id: string): Promise<WorkWeekPattern> {

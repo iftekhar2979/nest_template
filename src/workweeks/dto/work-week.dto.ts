@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   ArrayMinSize,
   IsArray,
@@ -11,6 +11,7 @@ import {
 } from 'class-validator';
 import { DayOverrideType } from '../schema/employee-day-override.schema';
 import { Weekday } from '../schema/work-week-pattern.schema';
+import { PaginationDto, SortOrder } from '../../shared/dto/pagination.dto';
 
 export class CreateWorkWeekPatternDto {
   @IsString()
@@ -90,4 +91,34 @@ export class CreateWeekdaySwapDto {
   @IsString()
   @MinLength(3)
   reason: string;
+}
+
+export enum WorkWeekPatternSortBy {
+  NAME = 'name',
+  CREATED_AT = 'createdAt',
+}
+
+export class QueryWorkWeekPatternDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Search by pattern name', example: 'standard' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by company UUID' })
+  @IsOptional()
+  @IsUUID()
+  companyId?: string;
+
+  @ApiPropertyOptional({
+    enum: WorkWeekPatternSortBy,
+    default: WorkWeekPatternSortBy.NAME,
+  })
+  @IsOptional()
+  @IsEnum(WorkWeekPatternSortBy)
+  sortBy?: WorkWeekPatternSortBy;
+
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.ASC })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

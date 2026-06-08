@@ -1,11 +1,13 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
+  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { PaginationDto, SortOrder } from '../../shared/dto/pagination.dto';
 
 export class CreateDesignationDto {
   @ApiProperty({
@@ -66,4 +68,34 @@ export class DesignationResponseDto extends CreateDesignationDto {
 export class DesignationDeleteResponseDto {
   @ApiProperty({ example: 'Designation deleted successfully' })
   message: string;
+}
+
+export enum DesignationSortBy {
+  TITLE = 'title',
+  CREATED_AT = 'createdAt',
+}
+
+export class QueryDesignationDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Search by designation title', example: 'engineer' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by department UUID' })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @ApiPropertyOptional({
+    enum: DesignationSortBy,
+    default: DesignationSortBy.TITLE,
+  })
+  @IsOptional()
+  @IsEnum(DesignationSortBy)
+  sortBy?: DesignationSortBy;
+
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.ASC })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
   HttpStatus,
@@ -27,6 +28,7 @@ import {
   UpdateDepartmentDto,
   DepartmentResponseDto,
   DepartmentDeleteResponseDto,
+  QueryDepartmentDto,
 } from './dto/department.dto';
 
 @ApiTags('Departments')
@@ -53,14 +55,18 @@ export class DepartmentsController {
 
   @Get()
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
-  @ApiOperation({ summary: 'Get all departments' })
+  @ApiOperation({
+    summary:
+      'List departments with pagination and filtering (search, parentDepartment, isGroup, disabled)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all departments retrieved successfully.',
+    description:
+      'Paginated list of departments: { data: DepartmentResponseDto[], pagination }.',
     type: [DepartmentResponseDto],
   })
-  findAll() {
-    return this.departmentsService.findAll();
+  findAll(@Query() query: QueryDepartmentDto) {
+    return this.departmentsService.findAll(query);
   }
 
   @Get(':id')

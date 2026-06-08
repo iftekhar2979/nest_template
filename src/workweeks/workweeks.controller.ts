@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import {
   CreateDayOverrideDto,
   CreateWeekdaySwapDto,
   CreateWorkWeekPatternDto,
+  QueryWorkWeekPatternDto,
   UpdateWorkWeekPatternDto,
 } from './dto/work-week.dto';
 import { WorkweeksService } from './workweeks.service';
@@ -34,8 +36,8 @@ export class WorkweeksController {
   }
 
   @Get('patterns')
-  findPatterns() {
-    return this.workweeksService.findPatterns();
+  findPatterns(@Query() query: QueryWorkWeekPatternDto) {
+    return this.workweeksService.findPatterns(query);
   }
 
   @Get('patterns/:id')

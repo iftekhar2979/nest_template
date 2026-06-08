@@ -2,7 +2,15 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Holiday } from './schema/holiday.schema';
-import { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
+import {
+  CreateHolidayDto,
+  HolidaySortBy,
+  QueryHolidayDto,
+  UpdateHolidayDto,
+} from './dto/holiday.dto';
+import { pagination } from '../common/pagination/pagination';
+import { IPagination } from '../common/pagination/pagination.interface';
+import { SortOrder } from '../shared/dto/pagination.dto';
 
 @Injectable()
 export class HolidaysService {
@@ -17,11 +25,47 @@ export class HolidaysService {
     );
   }
 
-  findAll(region?: string): Promise<Holiday[]> {
-    return this.holidayRepo.find({
-      where: region ? { region } : {},
-      order: { date: 'ASC' },
-    });
+  async findAll(
+    query: QueryHolidayDto,
+  ): Promise<{ data: Holiday[]; pagination: IPagination }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? HolidaySortBy.DATE;
+    const sortOrder = query.sortOrder ?? SortOrder.ASC;
+
+    const qb = this.holidayRepo.createQueryBuilder('holiday');
+
+    if (query.search) {
+      qb.andWhere('holiday.name LIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
+    if (query.region) {
+      qb.andWhere('holiday.region = :region', { region: query.region });
+    }
+    if (query.holidayListId) {
+      qb.andWhere('holiday.holidayListId = :holidayListId', {
+        holidayListId: query.holidayListId,
+      });
+    }
+    if (query.isRecurring !== undefined) {
+      qb.andWhere('holiday.isRecurring = :isRecurring', {
+        isRecurring: query.isRecurring,
+      });
+    }
+    if (query.fromDate) {
+      qb.andWhere('holiday.date >= :fromDate', { fromDate: query.fromDate });
+    }
+    if (query.toDate) {
+      qb.andWhere('holiday.date <= :toDate', { toDate: query.toDate });
+    }
+
+    qb.orderBy(`holiday.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, pagination: pagination(limit, page, total) };
   }
 
   async findOne(id: string): Promise<Holiday> {

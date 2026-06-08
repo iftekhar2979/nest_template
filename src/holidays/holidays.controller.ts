@@ -17,7 +17,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
@@ -29,6 +28,7 @@ import {
   UpdateHolidayDto,
   HolidayResponseDto,
   HolidayDeleteResponseDto,
+  QueryHolidayDto,
 } from './dto/holiday.dto';
 
 @ApiTags('Holidays')
@@ -55,19 +55,18 @@ export class HolidaysController {
   // Any authenticated user can view the holiday calendar
   @Get()
   @Roles(...Object.values(RoleType))
-  @ApiOperation({ summary: 'Get all holidays' })
-  @ApiQuery({
-    name: 'region',
-    description: 'Filter holidays by region (e.g., "global", "New York")',
-    required: false,
+  @ApiOperation({
+    summary:
+      'List holidays with pagination and filtering (search, region, holidayListId, isRecurring, date range)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all holidays retrieved successfully.',
+    description:
+      'Paginated list of holidays: { data: HolidayResponseDto[], pagination }.',
     type: [HolidayResponseDto],
   })
-  findAll(@Query('region') region?: string) {
-    return this.holidaysService.findAll(region);
+  findAll(@Query() query: QueryHolidayDto) {
+    return this.holidaysService.findAll(query);
   }
 
   @Get(':id')

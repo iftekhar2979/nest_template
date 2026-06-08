@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
   HttpStatus,
@@ -32,6 +33,7 @@ import {
   BulkAssignResponseDto,
   ShiftDeleteResponseDto,
   ShiftAssignmentDeleteResponseDto,
+  QueryShiftDto,
 } from './dto/shift.dto';
 
 @ApiTags('Shifts')
@@ -56,14 +58,18 @@ export class ShiftsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all shift definitions' })
+  @ApiOperation({
+    summary:
+      'List shift definitions with pagination and filtering (search, type, isOvernight)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all shifts retrieved successfully.',
+    description:
+      'Paginated list of shifts: { data: ShiftResponseDto[], pagination }.',
     type: [ShiftResponseDto],
   })
-  findAll() {
-    return this.shiftsService.findAll();
+  findAll(@Query() query: QueryShiftDto) {
+    return this.shiftsService.findAll(query);
   }
 
   // --- Assignments (declared before :id to avoid route clash) ---

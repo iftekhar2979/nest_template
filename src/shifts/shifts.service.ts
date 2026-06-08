@@ -12,8 +12,13 @@ import {
   AssignShiftDto,
   BulkAssignShiftDto,
   CreateShiftDto,
+  QueryShiftDto,
+  ShiftSortBy,
   UpdateShiftDto,
 } from './dto/shift.dto';
+import { pagination } from '../common/pagination/pagination';
+import { IPagination } from '../common/pagination/pagination.interface';
+import { SortOrder } from '../shared/dto/pagination.dto';
 
 @Injectable()
 export class ShiftsService {
@@ -39,8 +44,34 @@ export class ShiftsService {
     );
   }
 
-  findAll(): Promise<Shift[]> {
-    return this.shiftRepo.find({ order: { name: 'ASC' } });
+  async findAll(
+    query: QueryShiftDto,
+  ): Promise<{ data: Shift[]; pagination: IPagination }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? ShiftSortBy.NAME;
+    const sortOrder = query.sortOrder ?? SortOrder.ASC;
+
+    const qb = this.shiftRepo.createQueryBuilder('shift');
+
+    if (query.search) {
+      qb.andWhere('shift.name LIKE :search', { search: `%${query.search}%` });
+    }
+    if (query.type) {
+      qb.andWhere('shift.type = :type', { type: query.type });
+    }
+    if (query.isOvernight !== undefined) {
+      qb.andWhere('shift.isOvernight = :isOvernight', {
+        isOvernight: query.isOvernight,
+      });
+    }
+
+    qb.orderBy(`shift.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, pagination: pagination(limit, page, total) };
   }
 
   async findOne(id: string): Promise<Shift> {

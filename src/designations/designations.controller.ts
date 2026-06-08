@@ -17,7 +17,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
@@ -29,6 +28,7 @@ import {
   UpdateDesignationDto,
   DesignationResponseDto,
   DesignationDeleteResponseDto,
+  QueryDesignationDto,
 } from './dto/designation.dto';
 
 @ApiTags('Designations')
@@ -54,19 +54,18 @@ export class DesignationsController {
 
   @Get()
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
-  @ApiOperation({ summary: 'Get all designations' })
-  @ApiQuery({
-    name: 'departmentId',
-    description: 'Optional department UUID to filter designations',
-    required: false,
+  @ApiOperation({
+    summary:
+      'List designations with pagination and filtering (search, departmentId)',
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all designations retrieved successfully.',
+    description:
+      'Paginated list of designations: { data: DesignationResponseDto[], pagination }.',
     type: [DesignationResponseDto],
   })
-  findAll(@Query('departmentId') departmentId?: string) {
-    return this.designationsService.findAll(departmentId);
+  findAll(@Query() query: QueryDesignationDto) {
+    return this.designationsService.findAll(query);
   }
 
   @Get(':id')

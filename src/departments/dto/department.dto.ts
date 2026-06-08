@@ -1,12 +1,18 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsEnum,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
   MinLength,
 } from 'class-validator';
+import {
+  PaginationDto,
+  SortOrder,
+  ToBoolean,
+} from '../../shared/dto/pagination.dto';
 
 export class CreateDepartmentDto {
   @ApiProperty({
@@ -96,4 +102,46 @@ export class DepartmentResponseDto extends CreateDepartmentDto {
 export class DepartmentDeleteResponseDto {
   @ApiProperty({ example: 'Department deleted successfully' })
   message: string;
+}
+
+export enum DepartmentSortBy {
+  DEPARTMENT_NAME = 'departmentName',
+  CREATED_AT = 'createdAt',
+}
+
+export class QueryDepartmentDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Search by department name', example: 'eng' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by parent department UUID' })
+  @IsOptional()
+  @IsUUID()
+  parentDepartment?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by group (non-leaf) flag' })
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
+  isGroup?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by disabled flag' })
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
+  disabled?: boolean;
+
+  @ApiPropertyOptional({
+    enum: DepartmentSortBy,
+    default: DepartmentSortBy.DEPARTMENT_NAME,
+  })
+  @IsOptional()
+  @IsEnum(DepartmentSortBy)
+  sortBy?: DepartmentSortBy;
+
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.ASC })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

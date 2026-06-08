@@ -1,11 +1,17 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
+import {
+  PaginationDto,
+  SortOrder,
+  ToBoolean,
+} from '../../shared/dto/pagination.dto';
 
 export class CreateHolidayDto {
   @ApiProperty({ description: 'The name of the holiday', example: 'New Year Day' })
@@ -66,4 +72,53 @@ export class HolidayResponseDto extends CreateHolidayDto {
 export class HolidayDeleteResponseDto {
   @ApiProperty({ example: 'Holiday deleted successfully' })
   message: string;
+}
+
+export enum HolidaySortBy {
+  DATE = 'date',
+  NAME = 'name',
+  CREATED_AT = 'createdAt',
+}
+
+export class QueryHolidayDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Search by holiday name', example: 'new year' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by region', example: 'global' })
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by holiday list ID', example: 'HL-2024' })
+  @IsOptional()
+  @IsString()
+  holidayListId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by recurring flag' })
+  @IsOptional()
+  @ToBoolean()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @ApiPropertyOptional({ description: 'Start of date range (YYYY-MM-DD)', example: '2024-01-01' })
+  @IsOptional()
+  @IsDateString()
+  fromDate?: string;
+
+  @ApiPropertyOptional({ description: 'End of date range (YYYY-MM-DD)', example: '2024-12-31' })
+  @IsOptional()
+  @IsDateString()
+  toDate?: string;
+
+  @ApiPropertyOptional({ enum: HolidaySortBy, default: HolidaySortBy.DATE })
+  @IsOptional()
+  @IsEnum(HolidaySortBy)
+  sortBy?: HolidaySortBy;
+
+  @ApiPropertyOptional({ enum: SortOrder, default: SortOrder.ASC })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sortOrder?: SortOrder;
 }

@@ -6,7 +6,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Department } from './schema/department.schema';
-import { CreateDepartmentDto, UpdateDepartmentDto } from './dto/department.dto';
+import {
+  CreateDepartmentDto,
+  DepartmentSortBy,
+  QueryDepartmentDto,
+  UpdateDepartmentDto,
+} from './dto/department.dto';
+import { pagination } from '../common/pagination/pagination';
+import { IPagination } from '../common/pagination/pagination.interface';
+import { SortOrder } from '../shared/dto/pagination.dto';
 
 @Injectable()
 export class DepartmentsService {
@@ -31,8 +39,41 @@ export class DepartmentsService {
     );
   }
 
-  findAll(): Promise<Department[]> {
-    return this.departmentRepo.find({ order: { departmentName: 'ASC' } });
+  async findAll(
+    query: QueryDepartmentDto,
+  ): Promise<{ data: Department[]; pagination: IPagination }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? DepartmentSortBy.DEPARTMENT_NAME;
+    const sortOrder = query.sortOrder ?? SortOrder.ASC;
+
+    const qb = this.departmentRepo.createQueryBuilder('department');
+
+    if (query.search) {
+      qb.andWhere('department.departmentName LIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
+    if (query.parentDepartment) {
+      qb.andWhere('department.parentDepartment = :parentDepartment', {
+        parentDepartment: query.parentDepartment,
+      });
+    }
+    if (query.isGroup !== undefined) {
+      qb.andWhere('department.isGroup = :isGroup', { isGroup: query.isGroup });
+    }
+    if (query.disabled !== undefined) {
+      qb.andWhere('department.disabled = :disabled', {
+        disabled: query.disabled,
+      });
+    }
+
+    qb.orderBy(`department.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, pagination: pagination(limit, page, total) };
   }
 
   async findOne(id: string): Promise<Department> {
