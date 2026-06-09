@@ -116,7 +116,7 @@ export class LeaveService {
       where: {
         employeeId: dto.employeeId,
         leaveTypeId: dto.leaveTypeId,
-        year: dto.year,
+        year: Number(dto.year),
       },
       withDeleted: true,
     });
@@ -134,7 +134,7 @@ export class LeaveService {
         employeeId: dto.employeeId,
         userId: employee.userId,
         leaveTypeId: dto.leaveTypeId,
-        year: dto.year,
+        year: Number(dto.year),
         totalAllocatedDays: this.toDecimal(total),
         fromDate: dto.fromDate ?? null,
         toDate: dto.toDate ?? null,
@@ -153,7 +153,7 @@ export class LeaveService {
           entryType: LeaveLedgerType.ALLOCATION,
           amountDays: this.toDecimal(total),
           entryDate: dto.fromDate ?? `${dto.year}-01-01`,
-          year: dto.year,
+          year: Number(dto.year),
           referenceId: allocation.id,
           note: 'Annual allocation',
           createdBy: actorId ?? null,
@@ -184,10 +184,21 @@ export class LeaveService {
     if (query.year) {
       qb.andWhere('alloc.year = :year', { year: query.year });
     }
+    qb.leftJoinAndSelect('alloc.employee', 'employee')
+    .leftJoinAndSelect('alloc.leaveType', 'leaveType')
+    .select([
+      'alloc',                     // all allocation fields
+      'employee.id',
+      'employee.employeeName',
+      'employee.employeeStatus',
+      'employee.employeeCode',
 
-    qb.orderBy('alloc.year', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+      'leaveType.id',        
+      'leaveType.name'      
+    ])
+    .orderBy('alloc.year', 'DESC')
+    .skip((page - 1) * limit)
+    .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
     return { data, pagination: pagination(limit, page, total) };
