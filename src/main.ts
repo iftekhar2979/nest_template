@@ -91,18 +91,14 @@ async function bootstrap() {
   app.setBaseViewsDir(join(__dirname, "..", "..", "src", "views"));
   app.setViewEngine("ejs");
   app.use((req, res, next) => {
-    if (req.originalUrl === "/api/v1/stripe/webhook") {
+    console.log(req.query)
+    if (req.originalUrl === "/api/v1/stripe/webhook" || req.originalUrl === "/api/v1/webhook/zkteco") {
       return next();
     }
     json({ limit: "500kb" })(req, res, next);
   });
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-  app.use((req, res, next) => {
-    if (req.originalUrl === "/api/v1/stripe/webhook") {
-      return next();
-    }
-    urlencoded({ extended: true, limit: "500kb" })(req, res, next);
-  });
+ 
 
   app.disable("x-powered-by");
   app.set("trust proxy", 1);

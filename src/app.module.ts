@@ -27,6 +27,7 @@ import { CompanyModule } from './company/company.module';
 import { BranchModule } from './branch/branch.module';
 import { LeaveModule } from './leave/leave.module';
 import { WorkweeksModule } from './workweeks/workweeks.module';
+import { WebhookModule } from './webhook/webhook.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -84,6 +85,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     BranchModule,
     LeaveModule,
     WorkweeksModule,
+    WebhookModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Employee } from '../employees/schema/employee.schema';
 import { HolidaysService } from '../holidays/holidays.service';
 import { Shift } from '../shifts/schema/shift.schema';
@@ -22,6 +22,7 @@ import {
   CheckInOutDto,
   ManualCorrectionDto,
   PunchDto,
+  ZktecoPunchDto,
 } from './dto/attendance.dto';
 
 type ComputedMetrics = {
@@ -86,6 +87,132 @@ export class AttendanceService {
     }
 
     return { accepted, duplicates, recomputed: affected.size };
+  }
+
+  // --- ZKTeco device ingestion (PIN = employeeNumber, order-based in/out) ---
+
+  /**
+   * Ingest raw punches forwarded by the ZKTeco push bridge. Resolves each
+   * device PIN to the employee's userId via employeeNumber, dedupes on the
+   * device's SN+index, then derives check-in/out from punch order (the
+   * device's inoutstatus flag is unreliable, so it is ignored).
+   */
+  async recordDevicePunches(items: ZktecoPunchDto[]): Promise<{
+    accepted: number;
+    duplicates: number;
+    unmatched: string[];
+    recomputed: number;
+  }> {
+    const result = {
+      accepted: 0,
+      duplicates: 0,
+      unmatched: [] as string[],
+      recomputed: 0,
+    };
+
+    const pins = [...new Set(items.map((i) => i.pin))];
+    const employees = await this.employeeRepo.find({
+      where: { employeeNumber: In(pins) },
+      select: ['userId', 'employeeNumber'],
+    });
+    const pinToUser = new Map(
+      employees.map((e) => [e.employeeNumber, e.userId]),
+    );
+
+    const affected = new Set<string>();
+    const seenExternalIds = new Set<string>();
+
+    for (const item of items) {
+      const userId = pinToUser.get(item.pin);
+      if (!userId) {
+        if (!result.unmatched.includes(item.pin)) {
+          result.unmatched.push(item.pin);
+        }
+        continue;
+      }
+
+      const externalId = this.buildDeviceExternalId(item);
+      if (seenExternalIds.has(externalId)) {
+        result.duplicates += 1;
+        continue;
+      }
+      seenExternalIds.add(externalId);
+
+      const punchedAt = this.parseDeviceTime(item.time);
+      const saved = await this.savePunch(
+        {
+          userId,
+          // provisional; corrected by relabelDevicePunchesByOrder below
+          punchType: PunchType.IN,
+          punchedAt: punchedAt.toISOString(),
+          source: PunchSource.BIOMETRIC,
+          deviceId: item.sn ?? null,
+          externalId,
+        },
+        punchedAt,
+      );
+      if (!saved) {
+        result.duplicates += 1;
+        continue;
+      }
+      result.accepted += 1;
+      affected.add(`${userId}|${this.toDateString(punchedAt)}`);
+    }
+
+    for (const key of affected) {
+      const [userId, date] = key.split('|');
+      await this.relabelDevicePunchesByOrder(userId, date);
+      await this.recomputeRecord(userId, date);
+    }
+    result.recomputed = affected.size;
+
+    return result;
+  }
+
+  // Stable dedupe key per device record: SN+index when available, else
+  // SN+pin+time so a re-pushed log is never double-counted.
+  private buildDeviceExternalId(item: ZktecoPunchDto): string {
+    const sn = item.sn ?? 'na';
+    if (item.index) {
+      return `zk:${sn}:${item.index}`;
+    }
+    return `zk:${sn}:${item.pin}:${item.time}`;
+  }
+
+  // Device sends local "YYYY-MM-DD HH:MM:SS"; parse it in the server's local
+  // timezone (bridge and server are assumed co-located / same TZ).
+  private parseDeviceTime(time: string): Date {
+    const iso = time.includes('T') ? time : time.replace(' ', 'T');
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Invalid device punch time: ${time}`);
+    }
+    return parsed;
+  }
+
+  // Re-label a day's biometric punches by chronological order so recompute
+  // reads a sensible span: earliest = check-in, everything after = check-out.
+  private async relabelDevicePunchesByOrder(
+    userId: string,
+    date: string,
+  ): Promise<void> {
+    const dayStart = new Date(`${date}T00:00:00`);
+    const dayEnd = new Date(`${date}T23:59:59.999`);
+    const punches = await this.punchRepo.find({
+      where: {
+        userId,
+        source: PunchSource.BIOMETRIC,
+        punchedAt: Between(dayStart, dayEnd),
+      },
+      order: { punchedAt: 'ASC' },
+    });
+
+    for (let i = 0; i < punches.length; i += 1) {
+      const desired = i === 0 ? PunchType.IN : PunchType.OUT;
+      if (punches[i].punchType !== desired) {
+        await this.punchRepo.update({ id: punches[i].id }, { punchType: desired });
+      }
+    }
   }
 
   private async savePunch(
