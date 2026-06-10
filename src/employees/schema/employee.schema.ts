@@ -1,4 +1,4 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
 import { Company } from '../../company/schema/company.schema';
 import { Branch } from '../../branch/schema/branch.schema';
@@ -6,6 +6,7 @@ import { Shift } from '../../shifts/schema/shift.schema';
 import { Department } from '../../departments/schema/department.schema';
 import { Designation } from '../../designations/schema/designation.schema';
 import { WorkWeekPattern } from '../../workweeks/schema/work-week-pattern.schema';
+import { User } from '../../users/schema/users.schema';
 
 export enum EmploymentType {
   PROBATION = 'probation',
@@ -70,6 +71,10 @@ export enum BiometricModality {
 @Index('idx_employee_reports_to', ['reportsToEmployeeId'])
 export class Employee extends Base {
   // Link to the User login (1:1)
+  @OneToOne(() => User, (user) => user.employee)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
   @Index('idx_employee_user', { unique: true })
   @Column({ type: 'varchar', length: 36, unique: true })
   userId: string;

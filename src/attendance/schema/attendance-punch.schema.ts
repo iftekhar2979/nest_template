@@ -1,6 +1,7 @@
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../users/schema/users.schema';
 
 export enum PunchType {
   IN = 'in',
@@ -17,6 +18,10 @@ export enum PunchSource {
 @Entity('attendance_punches')
 @Index('idx_punch_user_time', ['userId', 'punchedAt'])
 export class AttendancePunch extends Base {
+  @ManyToOne(() => User, (user) => user.attendancePunches)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
   @ApiProperty({ description: 'User UUID', example: 'u1v2w3x4-y5z6-7a8b-c9d0-e1f2g3h4i5j6' })
   @Column({ type: 'varchar', length: 36 })
   userId: string;

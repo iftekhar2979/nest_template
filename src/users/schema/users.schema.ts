@@ -1,6 +1,10 @@
-import { BeforeInsert, Column, Entity, Index } from 'typeorm';
+import { BeforeInsert, Column, Entity, Index, OneToMany, OneToOne } from 'typeorm';
 import * as argon2 from 'argon2';
 import { Base } from '../../common/schema/base.schema';
+import { AttendanceRecord } from '../../attendance/schema/attendance.schema';
+import { AttendancePunch } from '../../attendance/schema/attendance-punch.schema';
+import { AttendanceRequest } from '../../attendance/schema/attendance-request.schema';
+import { Employee } from '../../employees/schema/employee.schema';
 
 export enum RoleType {
   SUPERADMIN = 'superadmin',
@@ -76,6 +80,21 @@ export class User extends Base {
 
   @Column({ type: 'datetime', nullable: true, default: null })
   lastLoginAt: Date;
+
+  @OneToMany(() => AttendanceRecord, (attendance) => attendance.user)
+  attendanceRecords: AttendanceRecord[];
+
+  @OneToMany(() => AttendancePunch, (punch) => punch.user)
+  attendancePunches: AttendancePunch[];
+
+  @OneToMany(() => AttendanceRequest, (request) => request.user)
+  attendanceRequests: AttendanceRequest[];
+
+  @OneToMany(() => AttendanceRequest, (request) => request.reviewer)
+  reviewedRequests: AttendanceRequest[];
+
+  @OneToOne(() => Employee, (employee) => employee.user)
+  employee: Employee;
 
   @BeforeInsert()
   normalizeAndHash(): Promise<void> {

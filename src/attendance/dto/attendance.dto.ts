@@ -5,9 +5,12 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
+  Min,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -100,6 +103,25 @@ export class ZktecoBatchDto {
   @ValidateNested({ each: true })
   @Type(() => ZktecoPunchDto)
   punches: ZktecoPunchDto[];
+}
+
+// --- Punch-event webhook (single directional punch) ---
+
+export class PunchEventDto {
+  @ApiProperty({
+    description: 'User UUID of the employee',
+    example: 'u1v2w3x4-y5z6-7a8b-c9d0-e1f2g3h4i5j6',
+  })
+  @IsString()
+  employeeId: string;
+
+  @ApiProperty({ description: 'Punch timestamp (ISO 8601)', example: '2024-06-09T08:30:00Z' })
+  @IsDateString()
+  timestamp: string;
+
+  @ApiProperty({ description: 'Punch direction', enum: PunchType, example: PunchType.IN })
+  @IsEnum(PunchType)
+  direction: PunchType;
 }
 
 // --- Employee self check-in / check-out ---
@@ -200,6 +222,11 @@ export class AttendanceQueryDto {
   @IsDateString()
   to?: string;
 
+  @ApiPropertyOptional({ description: 'Search by user name, employee name, or employee code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
   @ApiPropertyOptional({ description: 'Filter by user UUID' })
   @IsOptional()
   @IsUUID()
@@ -219,6 +246,21 @@ export class AttendanceQueryDto {
   @IsOptional()
   @IsEnum(AttendanceStatus)
   status?: AttendanceStatus;
+
+  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  limit?: number = 10;
 }
 
 // --- Regularization requests ---

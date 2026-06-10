@@ -91,8 +91,7 @@ async function bootstrap() {
   app.setBaseViewsDir(join(__dirname, "..", "..", "src", "views"));
   app.setViewEngine("ejs");
   app.use((req, res, next) => {
-    console.log(req.query)
-    if (req.originalUrl === "/api/v1/stripe/webhook" || req.originalUrl === "/api/v1/webhook/zkteco") {
+    if (req.originalUrl === "/api/v1/stripe/webhook") {
       return next();
     }
     json({ limit: "500kb" })(req, res, next);

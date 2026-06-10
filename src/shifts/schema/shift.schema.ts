@@ -1,5 +1,6 @@
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, OneToMany } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
+import { AttendanceRecord } from '../../attendance/schema/attendance.schema';
 
 export enum ShiftType {
   FIXED = 'fixed',
@@ -48,4 +49,7 @@ export class Shift extends Base {
 
   @Column({ type: 'text', nullable: true })
   description: string;
+
+  @OneToMany(() => AttendanceRecord, (attendance) => attendance.shift)
+  attendanceRecords: AttendanceRecord[];
 }

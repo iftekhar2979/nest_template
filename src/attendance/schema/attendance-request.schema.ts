@@ -1,7 +1,8 @@
-import { Column, Entity, Index } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
 import { AttendanceStatus } from './attendance.schema';
 import { ApiProperty } from '@nestjs/swagger';
+import { User } from '../../users/schema/users.schema';
 
 export enum RequestType {
   MISSED_CHECK_IN = 'missed_check_in',
@@ -22,6 +23,10 @@ export enum RequestStatus {
 @Index('idx_request_user', ['userId'])
 @Index('idx_request_status', ['requestStatus'])
 export class AttendanceRequest extends Base {
+  @ManyToOne(() => User, (user) => user.attendanceRequests)
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
   @ApiProperty({ description: 'User UUID', example: 'u1v2w3x4-y5z6-7a8b-c9d0-e1f2g3h4i5j6' })
   @Column({ type: 'varchar', length: 36 })
   userId: string;
@@ -66,6 +71,10 @@ export class AttendanceRequest extends Base {
     default: RequestStatus.PENDING,
   })
   requestStatus: RequestStatus;
+
+  @ManyToOne(() => User, (user) => user.reviewedRequests)
+  @JoinColumn({ name: 'reviewedBy' })
+  reviewer: User;
 
   @ApiProperty({ description: 'User UUID of reviewer', example: 'r1v2w3x4...', nullable: true })
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })

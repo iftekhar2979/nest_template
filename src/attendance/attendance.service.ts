@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, In, Repository } from 'typeorm';
+import { Between, Brackets, In, Repository } from 'typeorm';
 import { Employee } from '../employees/schema/employee.schema';
 import { HolidaysService } from '../holidays/holidays.service';
 import { Shift } from '../shifts/schema/shift.schema';
@@ -24,6 +24,7 @@ import {
   PunchDto,
   ZktecoPunchDto,
 } from './dto/attendance.dto';
+import { PaginationRequest } from '../shared/utils/pagination';
 
 type ComputedMetrics = {
   workedMinutes: number;
@@ -283,8 +284,40 @@ export class AttendanceService {
 
   // --- Admin oversight ---
 
-  async findAll(query: AttendanceQueryDto): Promise<AttendanceRecord[]> {
+  private getFindAllQueryBuilder(query: AttendanceQueryDto) {
     const qb = this.recordRepo.createQueryBuilder('r');
+
+    // Populate user and shift info with selective fields
+    qb.leftJoin('r.user', 'u').addSelect([
+      'u.id',
+      'u.fullName',
+      'u.email',
+      'u.avatarUrl',
+    ]);
+    qb.leftJoin('u.employee', 'e').addSelect([
+      'e.id',
+      'e.employeeCode',
+      'e.employeeName',
+    ]);
+    qb.leftJoin('r.shift', 's').addSelect([
+      's.id',
+      's.name',
+      's.startTime',
+      's.endTime',
+      's.type',
+    ]);
+
+    if (query.search) {
+      const term = `%${query.search}%`;
+      qb.andWhere(
+        new Brackets((inner) => {
+          inner
+            .where('u.fullName LIKE :term', { term })
+            .orWhere('e.employeeName LIKE :term', { term })
+            .orWhere('e.employeeCode LIKE :term', { term });
+        }),
+      );
+    }
 
     if (query.userId)
       qb.andWhere('r.userId = :userId', { userId: query.userId });
@@ -295,6 +328,17 @@ export class AttendanceService {
     if (query.from) qb.andWhere('r.date >= :from', { from: query.from });
     if (query.to) qb.andWhere('r.date <= :to', { to: query.to });
 
+    return qb;
+  }
+
+  async findAll(query: AttendanceQueryDto): Promise<{
+    data: AttendanceRecord[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const qb = this.getFindAllQueryBuilder(query);
+
     if (query.departmentId) {
       const employees = await this.employeeRepo.find({
         where: { departmentId: query.departmentId },
@@ -302,12 +346,28 @@ export class AttendanceService {
       });
       const ids = employees.map((employee) => employee.userId);
       if (ids.length === 0) {
-        return [];
+        return {
+          data: [],
+          total: 0,
+          page: query.page || 1,
+          limit: query.limit || 10,
+        };
       }
       qb.andWhere('r.userId IN (:...ids)', { ids });
     }
 
-    return qb.orderBy('r.date', 'DESC').addOrderBy('r.userId', 'ASC').getMany();
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await qb
+      .orderBy('r.date', 'DESC')
+      .addOrderBy('r.userId', 'ASC')
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
   }
 
   async manualCorrection(
@@ -344,7 +404,26 @@ export class AttendanceService {
   }
 
   async exportCsv(query: AttendanceQueryDto): Promise<string> {
-    const records = await this.findAll(query);
+    const qb = this.getFindAllQueryBuilder(query);
+
+    if (query.departmentId) {
+      const employees = await this.employeeRepo.find({
+        where: { departmentId: query.departmentId },
+        select: ['userId'],
+      });
+      const ids = employees.map((employee) => employee.userId);
+      if (ids.length > 0) {
+        qb.andWhere('r.userId IN (:...ids)', { ids });
+      } else {
+        // If department requested but no employees found, return empty CSV
+        return '';
+      }
+    }
+
+    const records = await qb
+      .orderBy('r.date', 'DESC')
+      .addOrderBy('r.userId', 'ASC')
+      .getMany();
     const header = [
       'date',
       'userId',

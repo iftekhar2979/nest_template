@@ -8,6 +8,7 @@ import {
   Request,
   Res,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -26,6 +27,11 @@ import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RoleType } from 'src/users/schema/users.schema';
 import { DeviceApiKeyGuard } from 'src/shared/guards/device-api-key.guard';
+import { PaginationInterceptor } from 'src/shared/interceptors/pagination.interceptor';
+import {
+  PaginationParams,
+  PaginationRequest,
+} from 'src/shared/utils/pagination';
 import { AttendanceService } from './attendance.service';
 import {
   AttendanceQueryDto,
@@ -40,22 +46,16 @@ import { AttendancePunch } from './schema/attendance-punch.schema';
 
 class PaginationMetadata {
   @ApiProperty({ example: 1 })
-  currentPage: number;
+  page: number;
 
   @ApiProperty({ example: 100 })
-  totalItems: number;
+  total: number;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty({ example: 10 })
+  limit: number;
+
+  @ApiProperty({ example: 10 })
   totalPages: number;
-
-  @ApiProperty({ example: 2, nullable: true })
-  nextPage: number | null;
-
-  @ApiProperty({ example: null, nullable: true })
-  previousPage: number | null;
-
-  @ApiProperty({ example: 20 })
-  itemsPerPage: number;
 }
 
 class AttendanceRecordPaginationResponse {
@@ -151,6 +151,7 @@ export class AttendanceController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @UseInterceptors(PaginationInterceptor)
   @ApiOperation({ summary: 'List all attendance records (admin)' })
   @ApiResponse({
     status: HttpStatus.OK,
