@@ -5,6 +5,7 @@ import { AttendanceRecord } from '../../attendance/schema/attendance.schema';
 import { AttendancePunch } from '../../attendance/schema/attendance-punch.schema';
 import { AttendanceRequest } from '../../attendance/schema/attendance-request.schema';
 import { Employee } from '../../employees/schema/employee.schema';
+import { ApiProperty } from '@nestjs/swagger';
 
 export enum RoleType {
   SUPERADMIN = 'superadmin',
@@ -32,6 +33,7 @@ export enum UserStatus {
 @Index('idx_users_subscription_lookup', ['subscriptionStatus', 'accessExpiresAt'])
 @Index('idx_users_created_at', ['createdAt'])
 export class User extends Base {
+  @ApiProperty({ example: 'john@example.com' })
   @Index('idx_users_email', { unique: true })
   @Column({ type: 'varchar', unique: true })
   email: string;
@@ -39,45 +41,59 @@ export class User extends Base {
   @Column({ type: 'varchar', select: false })
   passwordHash: string;
 
+  @ApiProperty({ example: '+1234567890', nullable: true })
   @Column({ type: 'varchar', nullable: true })
   phoneNumber: string;
 
+  @ApiProperty({ example: 'John Doe' })
   @Column({ type: 'varchar' })
   fullName: string;
 
+  @ApiProperty({ example: 'https://example.com/avatar.jpg' })
   @Column({ type: 'varchar', default: '' })
   avatarUrl: string;
 
+  @ApiProperty({ example: true })
   @Column({ type: 'boolean', default: false })
   isEmailVerified: boolean;
 
+  @ApiProperty({ example: true })
   @Column({ type: 'boolean', default: false })
   isTcPpAccepted: boolean;
 
+  @ApiProperty({ example: '2024-06-10T10:00:00Z', nullable: true })
   @Column({ type: 'datetime', nullable: true, default: null })
   emailVerifiedAt: Date;
 
+  @ApiProperty({ example: 'plan-uuid', nullable: true })
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   activePlanId: string;
 
+  @ApiProperty({ example: 'active', nullable: true })
   @Column({ type: 'varchar', nullable: true })
   subscriptionStatus: string; // active | expired | cancelled | trialing
 
+  @ApiProperty({ example: '2025-06-10T10:00:00Z', nullable: true })
   @Column({ type: 'datetime', nullable: true, default: null })
   accessExpiresAt: Date;
 
+  @ApiProperty({ enum: RoleType, example: RoleType.CLIENT })
   @Column({ type: 'enum', enum: RoleType, default: RoleType.CLIENT })
   role: RoleType;
 
+  @ApiProperty({ example: 'team-uuid', nullable: true })
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   teamId: string;
 
+  @ApiProperty({ example: 'dept-uuid', nullable: true })
   @Column({ type: 'varchar', length: 36, nullable: true, default: null })
   departmentId: string;
 
+  @ApiProperty({ example: 'Asia/Dhaka', nullable: true })
   @Column({ type: 'varchar', nullable: true })
   timezone: string;
 
+  @ApiProperty({ example: '2024-06-10T10:00:00Z', nullable: true })
   @Column({ type: 'datetime', nullable: true, default: null })
   lastLoginAt: Date;
 

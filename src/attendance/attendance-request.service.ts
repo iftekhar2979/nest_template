@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Brackets, Repository } from 'typeorm';
 import { AttendanceService } from './attendance.service';
 import { AttendanceSource, AttendanceStatus } from './schema/attendance.schema';
 import {
@@ -14,6 +14,7 @@ import {
   RequestType,
 } from './schema/attendance-request.schema';
 import {
+  AttendanceRequestQueryDto,
   CreateAttendanceRequestDto,
   ReviewRequestDto,
 } from './dto/attendance.dto';
@@ -57,11 +58,62 @@ export class AttendanceRequestService {
     });
   }
 
-  listAll(status?: RequestStatus): Promise<AttendanceRequest[]> {
-    return this.requestRepo.find({
-      where: status ? { requestStatus: status } : {},
-      order: { createdAt: 'DESC' },
-    });
+  async listAll(query: AttendanceRequestQueryDto): Promise<{
+    data: AttendanceRequest[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const qb = this.requestRepo.createQueryBuilder('r');
+
+    // Populate requester (with employee info) and reviewer with selective fields
+    qb.leftJoin('r.user', 'u').addSelect([
+      'u.id',
+      'u.fullName',
+      'u.email',
+      'u.avatarUrl',
+    ]);
+    qb.leftJoin('u.employee', 'e').addSelect([
+      'e.id',
+      'e.employeeCode',
+      'e.employeeName',
+    ]);
+    qb.leftJoin('r.reviewer', 'rv').addSelect([
+      'rv.id',
+      'rv.fullName',
+      'rv.email',
+    ]);
+
+    if (query.search) {
+      const term = `%${query.search}%`;
+      qb.andWhere(
+        new Brackets((inner) => {
+          inner
+            .where('u.fullName LIKE :term', { term })
+            .orWhere('e.employeeName LIKE :term', { term })
+            .orWhere('e.employeeCode LIKE :term', { term });
+        }),
+      );
+    }
+
+    if (query.status)
+      qb.andWhere('r.requestStatus = :status', { status: query.status });
+    if (query.type) qb.andWhere('r.type = :type', { type: query.type });
+    if (query.userId)
+      qb.andWhere('r.userId = :userId', { userId: query.userId });
+    if (query.from) qb.andWhere('r.date >= :from', { from: query.from });
+    if (query.to) qb.andWhere('r.date <= :to', { to: query.to });
+
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+
+    const [data, total] = await qb
+      .orderBy('r.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
   }
 
   async cancel(userId: string, id: string): Promise<AttendanceRequest> {

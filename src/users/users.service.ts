@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { Brackets, ILike, Repository } from 'typeorm';
 import { User } from './schema/users.schema';
 import { pagination } from 'src/common/pagination/pagination';
 import { IPagination } from 'src/common/pagination/pagination.interface';
@@ -15,7 +15,11 @@ export class UserService {
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     return this.userRepo.save(
-      this.userRepo.create(createUserDto as Partial<User>),
+      this.userRepo.create({
+        ...createUserDto,
+        // admin-created users are staff, not the schema's CLIENT default
+        role: createUserDto.role ?? RoleType.EMPLOYEE,
+      } as Partial<User>),
     );
   }
 
@@ -45,29 +49,40 @@ export class UserService {
     page: string;
     limit: string;
   }): Promise<{ data: User[]; pagination: IPagination }> {
-    const page = parseFloat(query.page);
-    const limit = parseFloat(query.limit);
+    const page = parseFloat(query.page) || 1;
+    const limit = parseFloat(query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const term = query.term ?? '';
-    const where = [
-      { fullName: ILike(`%${term}%`), role: RoleType.CLIENT },
-      { email: ILike(`%${term}%`), role: RoleType.CLIENT },
-    ];
+    const qb = this.userRepo.createQueryBuilder('u');
 
-    const [data, total] = await this.userRepo.findAndCount({
-      where,
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
-    });
+    qb.leftJoinAndSelect('u.employee', 'e');
+
+    const term = query.term ?? '';
+    if (term) {
+      qb.andWhere(
+        new Brackets((inner) => {
+          inner
+            .where('u.fullName ILIKE :term', { term: `%${term}%` })
+            .orWhere('u.email ILIKE :term', { term: `%${term}%` })
+            .orWhere('e.employeeCode ILIKE :term', { term: `%${term}%` })
+            .orWhere('e.employeeName ILIKE :term', { term: `%${term}%` });
+        }),
+      );
+    }
+
+    qb.orderBy('u.createdAt', 'DESC').skip(skip).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
 
     return { data, pagination: pagination(limit, page, total) };
   }
 
   // Find a user by ID
   findOne(id: string) {
-    return this.userRepo.findOne({ where: { id } });
+    return this.userRepo.findOne({
+      where: { id },
+      relations: ['employee'],
+    });
   }
 
   count() {

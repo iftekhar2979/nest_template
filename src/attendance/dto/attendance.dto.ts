@@ -16,7 +16,10 @@ import {
 } from 'class-validator';
 import { AttendanceStatus } from '../schema/attendance.schema';
 import { PunchSource, PunchType } from '../schema/attendance-punch.schema';
-import { RequestType } from '../schema/attendance-request.schema';
+import {
+  RequestStatus,
+  RequestType,
+} from '../schema/attendance-request.schema';
 
 // --- Device-agnostic punch ingestion ---
 
@@ -193,6 +196,16 @@ export class BulkCorrectionItemDto {
   @ApiProperty({ enum: AttendanceStatus, example: AttendanceStatus.PRESENT })
   @IsEnum(AttendanceStatus)
   attendanceStatus: AttendanceStatus;
+
+  @ApiPropertyOptional({ description: 'Corrected check-in time', example: '2024-06-09T09:00:00Z' })
+  @IsOptional()
+  @IsDateString()
+  checkInAt?: string;
+
+  @ApiPropertyOptional({ description: 'Corrected check-out time', example: '2024-06-09T18:00:00Z' })
+  @IsOptional()
+  @IsDateString()
+  checkOutAt?: string;
 }
 
 export class BulkCorrectionDto {
@@ -246,6 +259,53 @@ export class AttendanceQueryDto {
   @IsOptional()
   @IsEnum(AttendanceStatus)
   status?: AttendanceStatus;
+
+  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  limit?: number = 10;
+}
+
+export class AttendanceRequestQueryDto {
+  @ApiPropertyOptional({ description: 'Filter by request status', enum: RequestStatus })
+  @IsOptional()
+  @IsEnum(RequestStatus)
+  status?: RequestStatus;
+
+  @ApiPropertyOptional({ description: 'Filter by request type', enum: RequestType })
+  @IsOptional()
+  @IsEnum(RequestType)
+  type?: RequestType;
+
+  @ApiPropertyOptional({ description: 'Filter by user UUID' })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @ApiPropertyOptional({ description: 'Search by user name, employee name, or employee code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter from request date (YYYY-MM-DD)', example: '2024-06-01' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Filter to request date (YYYY-MM-DD)', example: '2024-06-30' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 
   @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
   @IsOptional()

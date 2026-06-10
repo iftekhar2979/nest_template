@@ -52,17 +52,27 @@ export class AttendanceService {
 
   async recordPunch(dto: PunchDto): Promise<AttendanceRecord> {
     const punchedAt = new Date(dto.punchedAt);
+    if (!(await this.isPunchWithinShiftWindow(dto.userId, punchedAt))) {
+      throw new BadRequestException(
+        'Punch rejected: time is outside the shift window (startTime - graceInMinutes to endTime + graceOutMinutes)',
+      );
+    }
     await this.savePunch(dto, punchedAt);
     return this.recomputeRecord(dto.userId, this.toDateString(punchedAt));
   }
 
-  async recordBatchPunches(
-    punches: PunchDto[],
-  ): Promise<{ accepted: number; duplicates: number; recomputed: number }> {
+  async recordBatchPunches(punches: PunchDto[]): Promise<{
+    accepted: number;
+    duplicates: number;
+    rejected: number;
+    recomputed: number;
+  }> {
     let accepted = 0;
     let duplicates = 0;
+    let rejected = 0;
     const affected = new Set<string>();
     const seenExternalIds = new Set<string>();
+    const shiftCache = new Map<string, Shift | null>();
 
     for (const dto of punches) {
       if (dto.externalId) {
@@ -73,6 +83,12 @@ export class AttendanceService {
         seenExternalIds.add(dto.externalId);
       }
       const punchedAt = new Date(dto.punchedAt);
+      if (
+        !(await this.isPunchWithinShiftWindow(dto.userId, punchedAt, shiftCache))
+      ) {
+        rejected += 1;
+        continue;
+      }
       const saved = await this.savePunch(dto, punchedAt);
       if (!saved) {
         duplicates += 1;
@@ -87,7 +103,7 @@ export class AttendanceService {
       await this.recomputeRecord(userId, date);
     }
 
-    return { accepted, duplicates, recomputed: affected.size };
+    return { accepted, duplicates, rejected, recomputed: affected.size };
   }
 
   // --- ZKTeco device ingestion (PIN = employeeNumber, order-based in/out) ---
@@ -95,18 +111,21 @@ export class AttendanceService {
   /**
    * Ingest raw punches forwarded by the ZKTeco push bridge. Resolves each
    * device PIN to the employee's userId via employeeNumber, dedupes on the
-   * device's SN+index, then derives check-in/out from punch order (the
+   * device's SN+index, rejects punches outside the shift window (start/end
+   * extended by grace), then derives check-in/out from punch order (the
    * device's inoutstatus flag is unreliable, so it is ignored).
    */
   async recordDevicePunches(items: ZktecoPunchDto[]): Promise<{
     accepted: number;
     duplicates: number;
+    rejected: number;
     unmatched: string[];
     recomputed: number;
   }> {
     const result = {
       accepted: 0,
       duplicates: 0,
+      rejected: 0,
       unmatched: [] as string[],
       recomputed: 0,
     };
@@ -122,6 +141,7 @@ export class AttendanceService {
 
     const affected = new Set<string>();
     const seenExternalIds = new Set<string>();
+    const shiftCache = new Map<string, Shift | null>();
 
     for (const item of items) {
       const userId = pinToUser.get(item.pin);
@@ -140,6 +160,12 @@ export class AttendanceService {
       seenExternalIds.add(externalId);
 
       const punchedAt = this.parseDeviceTime(item.time);
+      if (
+        !(await this.isPunchWithinShiftWindow(userId, punchedAt, shiftCache))
+      ) {
+        result.rejected += 1;
+        continue;
+      }
       const saved = await this.savePunch(
         {
           userId,
@@ -298,7 +324,11 @@ export class AttendanceService {
       'e.id',
       'e.employeeCode',
       'e.employeeName',
+      'e.departmentId',
+      'e.designationId',
     ]);
+    qb.leftJoin('e.department', 'd').addSelect(['d.id', 'd.departmentName']);
+    qb.leftJoin('e.designation', 'dg').addSelect(['dg.id', 'dg.title']);
     qb.leftJoin('r.shift', 's').addSelect([
       's.id',
       's.name',
@@ -321,6 +351,10 @@ export class AttendanceService {
 
     if (query.userId)
       qb.andWhere('r.userId = :userId', { userId: query.userId });
+    if (query.departmentId)
+      qb.andWhere('e.departmentId = :departmentId', {
+        departmentId: query.departmentId,
+      });
     if (query.shiftId)
       qb.andWhere('r.shiftId = :shiftId', { shiftId: query.shiftId });
     if (query.status)
@@ -338,23 +372,6 @@ export class AttendanceService {
     limit: number;
   }> {
     const qb = this.getFindAllQueryBuilder(query);
-
-    if (query.departmentId) {
-      const employees = await this.employeeRepo.find({
-        where: { departmentId: query.departmentId },
-        select: ['userId'],
-      });
-      const ids = employees.map((employee) => employee.userId);
-      if (ids.length === 0) {
-        return {
-          data: [],
-          total: 0,
-          page: query.page || 1,
-          limit: query.limit || 10,
-        };
-      }
-      qb.andWhere('r.userId IN (:...ids)', { ids });
-    }
 
     const page = query.page || 1;
     const limit = query.limit || 10;
@@ -395,6 +412,9 @@ export class AttendanceService {
         userId: item.userId,
         date: item.date,
         attendanceStatus: item.attendanceStatus,
+        // undefined keeps the existing punch times; only override when sent
+        checkInAt: item.checkInAt ? new Date(item.checkInAt) : undefined,
+        checkOutAt: item.checkOutAt ? new Date(item.checkOutAt) : undefined,
         source: AttendanceSource.MANUAL,
         remarks: dto.reason,
         actorId,
@@ -405,20 +425,6 @@ export class AttendanceService {
 
   async exportCsv(query: AttendanceQueryDto): Promise<string> {
     const qb = this.getFindAllQueryBuilder(query);
-
-    if (query.departmentId) {
-      const employees = await this.employeeRepo.find({
-        where: { departmentId: query.departmentId },
-        select: ['userId'],
-      });
-      const ids = employees.map((employee) => employee.userId);
-      if (ids.length > 0) {
-        qb.andWhere('r.userId IN (:...ids)', { ids });
-      } else {
-        // If department requested but no employees found, return empty CSV
-        return '';
-      }
-    }
 
     const records = await qb
       .orderBy('r.date', 'DESC')
@@ -602,6 +608,7 @@ export class AttendanceService {
 
       if (checkInAt) {
         const allowedIn = shiftStart.getTime() + shift.graceInMinutes * 60000;
+        
         lateMinutes = Math.max(
           0,
           Math.round((checkInAt.getTime() - allowedIn) / 60000),
@@ -620,16 +627,25 @@ export class AttendanceService {
     }
 
     const fullDay = shift?.fullDayMinutes ?? 480;
+    const halfDay = shift?.halfDayMinutes ?? fullDay / 2;
     let derivedStatus: AttendanceStatus;
     if (!checkInAt && !checkOutAt) {
       derivedStatus = AttendanceStatus.ABSENT;
     } else if (checkInAt && checkOutAt) {
-      derivedStatus =
-        workedMinutes >= fullDay
-          ? AttendanceStatus.PRESENT
-          : AttendanceStatus.HALF_DAY;
+      if (workedMinutes < halfDay) {
+        // Punched but below the half-day minimum
+        derivedStatus = AttendanceStatus.ABSENT;
+      } else if (workedMinutes < fullDay && earlyLeaveMinutes > 0) {
+        derivedStatus = AttendanceStatus.HALF_DAY;
+      } else {
+        // Full day covered; late/early minutes already exclude grace
+        derivedStatus =
+          lateMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
+      }
     } else {
-      derivedStatus = AttendanceStatus.HALF_DAY;
+      // Single punch: day still in progress, judge by check-in time only
+      derivedStatus =
+        lateMinutes > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;
     }
 
     return {
@@ -699,6 +715,76 @@ export class AttendanceService {
       date,
     );
     return workDay.isWeeklyOff ? AttendanceStatus.WEEKLY_OFF : baseStatus;
+  }
+
+  /**
+   * A punch is only valid inside the shift window extended by the grace
+   * times: [startTime - graceInMinutes, endTime + graceOutMinutes]. An
+   * early-morning punch is also checked against the previous day's shift when
+   * that shift is overnight (it may be the check-out of yesterday's shift).
+   * Users with no resolvable shift are not validated.
+   */
+  private async isPunchWithinShiftWindow(
+    userId: string,
+    punchedAt: Date,
+    shiftCache?: Map<string, Shift | null>,
+  ): Promise<boolean> {
+    const date = this.toDateString(punchedAt);
+    const shift = await this.resolveShiftCached(userId, date, shiftCache);
+    console.log(shift)
+    if (!shift) {
+      return true;
+    }
+    if (this.isInsideShiftWindow(punchedAt, date, shift)) {
+      return true;
+    }
+
+    const previous = new Date(punchedAt);
+    previous.setDate(previous.getDate() - 1);
+    const previousDate = this.toDateString(previous);
+    const previousShift = await this.resolveShiftCached(
+      userId,
+      previousDate,
+      shiftCache,
+    );
+    return Boolean(
+      previousShift &&
+        (previousShift.isOvernight ||
+          previousShift.endTime <= previousShift.startTime) &&
+        this.isInsideShiftWindow(punchedAt, previousDate, previousShift),
+    );
+  }
+
+  private isInsideShiftWindow(
+    punchedAt: Date,
+    date: string,
+    shift: Shift,
+  ): boolean {
+    const overnight = shift.isOvernight || shift.endTime <= shift.startTime;
+    const windowStart =
+      this.buildDateTime(date, shift.startTime).getTime() -
+      shift.graceInMinutes * 60000;
+    const windowEnd =
+      this.buildDateTime(date, shift.endTime, overnight).getTime() +
+      shift.graceOutMinutes * 60000;
+    return (
+      punchedAt.getTime() >= windowStart && punchedAt.getTime() <= windowEnd
+    );
+  }
+
+  // Avoids re-resolving the same user/day shift for every punch in a batch.
+  private async resolveShiftCached(
+    userId: string,
+    date: string,
+    cache?: Map<string, Shift | null>,
+  ): Promise<Shift | null> {
+    const key = `${userId}|${date}`;
+    if (cache?.has(key)) {
+      return cache.get(key) ?? null;
+    }
+    const shift = await this.resolveShiftForAttendance(userId, date);
+    cache?.set(key, shift);
+    return shift;
   }
 
   private async resolveShiftForAttendance(

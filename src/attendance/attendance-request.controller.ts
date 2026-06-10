@@ -9,6 +9,7 @@ import {
   Query,
   Request,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -25,8 +26,10 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guard/role-gurad';
 import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RoleType } from 'src/users/schema/users.schema';
+import { PaginationInterceptor } from 'src/shared/interceptors/pagination.interceptor';
 import { AttendanceRequestService } from './attendance-request.service';
 import {
+  AttendanceRequestQueryDto,
   CreateAttendanceRequestDto,
   ReviewRequestDto,
 } from './dto/attendance.dto';
@@ -34,22 +37,16 @@ import { AttendanceRequest, RequestStatus } from './schema/attendance-request.sc
 
 class PaginationMetadata {
   @ApiProperty({ example: 1 })
-  currentPage: number;
+  page: number;
+
+  @ApiProperty({ example: 10 })
+  limit: number;
 
   @ApiProperty({ example: 100 })
-  totalItems: number;
+  total: number;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty({ example: 10 })
   totalPages: number;
-
-  @ApiProperty({ example: 2, nullable: true })
-  nextPage: number | null;
-
-  @ApiProperty({ example: null, nullable: true })
-  previousPage: number | null;
-
-  @ApiProperty({ example: 20 })
-  itemsPerPage: number;
 }
 
 class AttendanceRequestPaginationResponse {
@@ -102,15 +99,18 @@ export class AttendanceRequestController {
 
   @Get()
   @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
-  @ApiOperation({ summary: 'List all attendance requests (admin)' })
-  @ApiQuery({ name: 'status', enum: RequestStatus, required: false, description: 'Filter by status' })
+  @UseInterceptors(PaginationInterceptor)
+  @ApiOperation({
+    summary:
+      'List all attendance requests (admin) with pagination and filtering (status, type, userId, search, date range)',
+  })
   @ApiResponse({
     status: HttpStatus.OK,
-    description: 'List of all requests.',
-    type: [AttendanceRequest],
+    description: 'Paginated list of attendance requests.',
+    schema: { $ref: getSchemaPath(AttendanceRequestPaginationResponse) },
   })
-  listAll(@Query('status') status?: RequestStatus) {
-    return this.attendanceRequestService.listAll(status);
+  listAll(@Query() query: AttendanceRequestQueryDto) {
+    return this.attendanceRequestService.listAll(query);
   }
 
   @Patch(':id/review')

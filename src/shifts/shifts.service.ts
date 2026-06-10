@@ -113,7 +113,7 @@ export class ShiftsService {
   ): Promise<ShiftAssignment> {
     await this.findOne(dto.shiftId);
     await this.ensureEmployeesExist([dto.userId]);
-    return this.assignmentRepo.save(
+    const assignment = await this.assignmentRepo.save(
       this.assignmentRepo.create({
         userId: dto.userId,
         shiftId: dto.shiftId,
@@ -122,6 +122,8 @@ export class ShiftsService {
         createdBy: actorId ?? null,
       }),
     );
+    await this.updateDefaultShift([dto.userId], dto.shiftId, actorId);
+    return assignment;
   }
 
   async bulkAssign(
@@ -140,7 +142,20 @@ export class ShiftsService {
       }),
     );
     await this.assignmentRepo.save(rows);
+    await this.updateDefaultShift(dto.userIds, dto.shiftId, actorId);
     return { assigned: rows.length };
+  }
+
+  // Keep the employee's fallback shift in sync with the latest assignment.
+  private async updateDefaultShift(
+    userIds: string[],
+    shiftId: string,
+    actorId?: string,
+  ): Promise<void> {
+    await this.employeeRepo.update(
+      { userId: In(userIds) },
+      { defaultShiftId: shiftId, updatedBy: actorId ?? null },
+    );
   }
 
   findAssignmentsForUser(userId: string): Promise<ShiftAssignment[]> {
