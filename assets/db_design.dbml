@@ -1,0 +1,594 @@
+
+// ─── ENUMS ───────────────────────────────────
+
+Enum user_role {
+  superadmin
+  admin
+  hto
+  sales_leader
+  sales_team_leader
+  sales_member
+  operation_leader
+  operation_member
+  client
+}
+
+Enum department_type {
+  sales
+  operations
+}
+
+Enum billing_type {
+  one_time
+  monthly_recurring
+  hybrid
+}
+
+Enum subscription_interval {
+  one_time
+  monthly
+  yearly
+}
+
+Enum subscription_status {
+  active
+  cancelled
+  past_due
+  trialing
+  paused
+}
+
+Enum project_status {
+  pending
+  active
+  on_hold
+  complete
+}
+
+Enum message_channel {
+  sales_client
+  internal_project
+}
+
+Enum booking_status {
+  requested     // Client asked for a call from the website, waiting for a sales rep
+  scheduled     // Sales rep accepted, Zoom API called, link generated and sent
+  completed     // Meeting took place
+  cancelled     // Meeting called off by either party
+  no_show       // Client or host missed the slot
+}
+
+Enum analytics_period {
+  daily
+  weekly
+  monthly
+  yearly
+}
+
+// Expanded enum to handle precise transaction & fulfillment lifecycles
+Enum offer_status {
+  pending            // Offer created, checkout link generated
+  payment_processing // Client is currently entering details / webhook pending
+  accepted           // Paid successfully, transaction complete, project active
+  declined           // Explicitly rejected by client
+  expired            // Payment link/offer window missed
+}
+
+Enum payment_source_type {
+  custom_offer
+  subscription_plan
+}
+
+// ─── DEPARTMENTS ─────────────────────────────
+
+Table departments {
+  id         varchar     [pk, note: 'ObjectId']
+  name       varchar     [not null]
+  type       department_type [not null]
+  leader_id  varchar     [ref: > users.id, note: 'Sales Leader or Operation Leader']
+  created_at timestamp  [default: `now()`]
+
+  Note: 'Top-level departments: Sales and Operations'
+}
+
+
+// ─── TEAMS ───────────────────────────────────
+
+Table teams {
+  id            varchar   [pk, note: 'ObjectId']
+  name          varchar   [not null]
+  department_id varchar   [not null, ref: > departments.id]
+  leader_id     varchar   [ref: > users.id, note: 'Sales Team Leader or Operation Leader']
+  created_at    timestamp [default: `now()`]
+
+  Note: 'Sub-teams within a department'
+}
+
+Table team_members {
+  id             varchar   [pk, note: 'ObjectId']
+  team_id        varchar   [not null, ref: > teams.id]
+  user_id        varchar   [not null, ref: > users.id, note: 'The employee account']
+  designation_id varchar 
+  is_active      boolean   [default: true, note: 'Soft status for historical tracking']
+  joined_at      timestamp [default: `now()`]
+
+  Note: 'The core roster mapping who works where, under what title.'
+
+  Indexes {
+    (team_id, user_id) [unique, name: 'idx_team_user_unique']
+    user_id [name: 'idx_member_user_lookup']
+    designation_id [name: 'idx_member_designation']
+  }
+}
+
+// ─── MINIMIZED ROLE PERMISSIONS ──────────────
+Table roles {
+  id          varchar   [pk, note: 'Unique role identifier matching user_role enum (e.g., admin, client, hto)']
+  permissions varchar[] [note: 'Array of string tokens, e.g., ["read:project", "write:team"]']
+  description varchar
+
+  Note: 'Keeps RBAC light. NestJS can fetch this array in a single query during login.'
+}
+// ─── USERS ───────────────────────────────────
+
+Table users {
+  id              varchar   [pk, note: 'ObjectId mapped from Base schema']
+  name            varchar   [not null, note: 'fullName in Mongoose']
+  email           varchar   [unique, not null, note: 'Trimmed, lowercase']
+  password_hash   varchar   [not null, note: 'select: false in Mongoose']
+  role            user_role [not null, default: 'USER']
+  is_active       boolean   [default: true]
+  team_id         varchar   [ref: > teams.id, note: 'Null for superadmin / admin / HTO']
+  department_id   varchar   [ref: > departments.id]
+
+  // Embedded profile fields (flattened)
+  phone           varchar   [note: 'phoneNumber']
+  avatar_url      varchar   [default: '']
+  timezone        varchar
+
+  // Email verification & legal
+  is_email_verified bool      [default: false]
+  email_verified_at timestamp [default: null]
+  is_tc_pp_accepted  bool      [default: false, note: 'Terms & Conditions / Privacy Policy accepted']
+
+  // Subscription management
+  active_plan_id      varchar   [ref: > subscription_plans.id, default: null]
+  subscription_status varchar   [note: 'active | expired | cancelled | trialing']
+  access_expires_at   timestamp [default: null]
+
+  // Security & Analytics
+  last_login_at   timestamp [default: null]
+  created_at      timestamp [default: `now()`]
+  updated_at      timestamp [default: `now()`]
+
+  Note: 'All staff roles. Clients also have a users row (role: client) + a clients row'
+
+  Indexes {
+    email [unique, name: 'idx_users_email']
+    role [name: 'idx_users_role']
+    team_id [name: 'idx_users_team_id']
+    department_id [name: 'idx_users_dept_id']
+    (subscription_status, access_expires_at) [name: 'idx_users_subscription_lookup']
+    created_at [name: 'idx_users_created_at']
+  }
+}
+
+
+Table transactions {
+  id                  varchar               [pk, note: 'ObjectId']
+  user_id             varchar               [not null, ref: > users.id, note: 'The customer paying']
+  amount              float                 [not null]
+  currency            varchar               [default: 'USD']
+  status              transaction_status    [default: 'pending']
+  
+  // Polymorphic core: Differentiates the product type
+  source_type         payment_source_type   [not null, note: 'custom_offer | subscription_plan']
+  source_id           varchar               [not null, note: 'Points to either custom_offers.id or user_subscriptions.id']
+  
+  // Gateway Handshaking
+  gateway_name        varchar               [not null, note: 'stripe | paypal']
+  gateway_session_id  varchar               [unique, note: 'Stripe Checkout Session ID / Payment Intent ID']
+  gateway_receipt_url varchar
+  
+  paid_at             timestamp             [default: null]
+  created_at          timestamp             [default: `now()`]
+  updated_at          timestamp             [default: `now()`]
+
+  Note: 'The single source of truth for platform revenue tracking.'
+
+  Indexes {
+    user_id [name: 'idx_tx_user_id']
+    gateway_session_id [name: 'idx_tx_webhook']
+    (source_type, source_id) [name: 'idx_tx_source_polymorphic']
+  }
+}
+
+
+// ─── BUSINESS MODULE A: SUBSCRIPTIONS ────────
+
+Table user_subscriptions {
+  id                   varchar             [pk, note: 'ObjectId']
+  user_id              varchar             [not null, ref: > users.id]
+  plan_id              varchar             [not null, ref: > subscription_plans.id]
+  status               subscription_status [default: 'trialing']
+  
+  gateway_customer_id  varchar             [note: 'Stripe Customer ID']
+  gateway_sub_id       varchar             [unique, note: 'Stripe Subscription ID']
+  
+  current_period_start timestamp
+  current_period_end   timestamp
+  created_at           timestamp           [default: `now()`]
+  updated_at           timestamp           [default: `now()`]
+}
+// ─── CLIENTS ─────────────────────────────────
+
+Table clients {
+  id                 varchar [pk, note: 'ObjectId']
+  user_id            varchar [unique, not null, ref: > users.id]
+  company_name       varchar
+  phone              varchar
+  stripe_customer_id varchar
+
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  Note: 'One client profile per client user. Projects live in the projects table — NOT embedded here — because one client can have many projects (unbounded).'
+}
+
+
+// ─── SERVICES ────────────────────────────────
+
+Table services {
+  id           varchar      [pk, note: 'ObjectId']
+  name         varchar      [not null]
+  description  text
+  billing_type billing_type [not null]
+  is_active    boolean      [default: true]
+  created_at   timestamp    [default: `now()`]
+  updated_at   timestamp    [default: `now()`]
+
+  Note: 'Platform services e.g. Service A, B, C'
+}
+
+// ─── SUBSCRIPTION PLANS ──────────────────────
+// In MongoDB these are embedded inside services.plans[].
+// Shown as a separate table here so dbdiagram renders the relationship.
+
+Table subscription_plans {
+  id            varchar               [pk, note: 'ObjectId — also stored as services.plans[]._id']
+  service_id    varchar               [not null, ref: > services.id]
+  name          varchar               [not null]
+  price         float                 [not null]
+  currency      varchar               [default: 'USD']
+  interval      subscription_interval [not null]
+  duration_days int                   [note: 'Non-null for one_time plans only']
+  is_active     boolean               [default: true]
+  created_at    timestamp             [default: `now()`]
+
+  Note: 'Embedded inside services in MongoDB. Separate table here for ERD clarity.'
+
+  Indexes {
+    service_id [name: 'idx_plans_service_id']
+    (is_active, interval) [name: 'idx_plans_active_interval']
+    (interval, duration_days) [name: 'idx_plans_type_duration', note: 'Optimizes one-time vs recurring differentiation']
+    price [name: 'idx_plans_price_sorting']
+  }
+}
+
+// ─── SUBSCRIPTIONS ───────────────────────────
+
+Table subscriptions {
+  id                     varchar             [pk, note: 'ObjectId']
+  client_id              varchar             [not null, ref: > clients.id]
+  service_id             varchar             [not null, ref: > services.id]
+  plan_id                varchar             [not null, ref: > subscription_plans.id]
+  stripe_subscription_id varchar             [unique, note: 'Null for some one-time manual invoices, unique for recurring']
+  stripe_customer_id     varchar
+  billing_type           billing_type        [not null]
+  status                 subscription_status [default: 'active']
+  starts_at              timestamp           [not null]
+  ends_at                timestamp           [note: 'Null for ongoing recurring. Fixed date for one-time plans.']
+  created_at             timestamp           [default: `now()`]
+  updated_at             timestamp           [default: `now()`]
+
+  Note: 'Zero, one, or many subscriptions per client. Supports stacked recurring and one-time purchases.'
+
+  Indexes {
+    stripe_subscription_id [unique, name: 'idx_subs_stripe_sub_id']
+    stripe_customer_id [name: 'idx_subs_stripe_cust_id']
+    
+    // NEW COMPOSITE INDEX: Fast lookup for a client's multiple active/past subscriptions
+    (client_id, status) [name: 'idx_subs_client_status_lookup'] 
+    
+    (service_id, plan_id) [name: 'idx_subs_service_plan']
+    (status, ends_at) [name: 'idx_subs_status_expiry']
+  }
+}
+// ─── PROJECTS ────────────────────────────────
+// SEPARATE collection — NOT embedded in clients.
+// One client can have MANY projects across multiple
+// subscriptions and services (unbounded, queried independently).
+
+// ─── PROJECTS (Streamlined) ──────────────────
+// ─── PROJECTS (The Macro Contract) ───────────
+Table projects {
+  id              varchar        [pk, note: 'ObjectId']
+  client_id       varchar        [not null, ref: > clients.id]
+  subscription_id varchar        [not null, ref: > subscriptions.id]
+  service_id      varchar        [not null, ref: > services.id]
+  title           varchar        [not null]
+  status          project_status [default: 'pending']
+  
+  // Total overall revenue paid by the client
+  total_revenue   float          [default: 0, note: 'The macro contract value paid by client']
+  currency        varchar        [default: 'USD']
+  
+  notes           text
+  created_at      timestamp      [default: `now()`]
+  updated_at      timestamp      [default: `now()`]
+
+  Note: 'The core project asset tracking total financial inflow.'
+
+  Indexes {
+    (client_id, status) [name: 'idx_proj_client_lookup']
+  }
+}
+
+// ─── PROJECT MEMBERS / ROSTER (Micro Finances)
+Table project_members {
+  id              varchar              [pk, note: 'ObjectId']
+  project_id      varchar              [not null, ref: > projects.id]
+  user_id         varchar              [not null, ref: > users.id]
+  project_role    project_member_role  [not null, note: 'operation_leader | sales_leader | sales_member | operation_member | hto | admin']
+  
+  // Member Financial Tracking Fields
+  allocated_revenue float              [default: 0, note: 'Flat revenue amount credited to this user for this project']
+  split_percentage  float              [default: 0, note: 'Percentage cut of the total project revenue if commission-based (e.g., 10.5 for 10.5%)']
+  cost_rate         float              [default: 0, note: 'Internal cost/payout rate for operation members working this job']
+  
+  assigned_at     timestamp            [default: `now()`]
+
+  Note: 'Tracks individual performance credits, sales commissions, or operational payouts.'
+
+  Indexes {
+    (project_id, user_id) [unique, name: 'idx_proj_member_unique']
+    (user_id, project_role) [name: 'idx_user_project_context']
+    (project_id, allocated_revenue) [name: 'idx_proj_revenue_distribution']
+  }
+}
+
+// ─── PROJECT STATUS HISTORY ──────────────────
+// In MongoDB embedded inside projects.status_history[].
+
+Table project_status_history {
+  id         varchar        [pk, note: 'ObjectId']
+  project_id varchar        [not null, ref: > projects.id]
+  changed_by varchar        [not null, ref: > users.id]
+  from_status project_status
+  to_status   project_status [not null]
+  note       text
+  changed_at timestamp      [default: `now()`]
+
+  Note: 'Embedded in MongoDB inside projects.status_history[]'
+}
+
+
+// ─── MESSAGES ────────────────────────────────
+// ─── MESSAGES (Streamlined) ──────────────────
+Table messages {
+  id              varchar   [pk, note: 'ObjectId']
+  conversation_id varchar   [not null, ref: > conversations.id, note: 'Links directly to the thread']
+  sender_id       varchar   [not null, ref: > users.id]
+  
+  // NEW RELATIONAL LINK: Renders an interactive UI Card if the message is an offer
+  custom_offer_id   varchar   [ref: > custom_offers.id, default: null, note: 'If present, UI renders this message as a rich accept/decline Offer Card']
+  // SELF-REFERENCE FOR REPLIES (Null if it is a top-level message)
+  parent_message_id varchar [ref: > messages.id, default: null, note: 'Null = normal message. Has ID = reply to that message ID']
+  
+  content          text      [not null]
+  is_read         boolean   [default: false]
+  sent_at         timestamp [default: `now()`]
+
+  Note: 'Lightweight append-only ledger supporting parent-child reply relationships natively.'
+
+  Indexes {
+    conversation_id [name: 'idx_msg_conversation_id']
+    (conversation_id, sent_at) [name: 'idx_msg_history_load']
+    parent_message_id [name: 'idx_msg_reply_lookup', note: 'Speeds up fetching comment sub-threads']
+  }
+}
+ 
+// ─── PINNED MESSAGES (Dynamic Pin Board) ──────
+Table pinned_messages {
+  id              varchar   [pk, note: 'ObjectId']
+  conversation_id varchar   [not null, ref: > conversations.id]
+  message_id      varchar   [not null, ref: > messages.id, note: 'The specific message being featured']
+  pinned_by       varchar   [not null, ref: > users.id, note: 'Tracks which admin or member pinned it']
+  pinned_at       timestamp [default: `now()`]
+
+  Note: 'Junction table handling pins. Keeps the core messages table clear of fluid structural updates.'
+
+  Indexes {
+    // Unique because a single message cannot be pinned multiple times in the same room
+    (conversation_id, message_id) [unique, name: 'idx_pinned_msg_unique']
+  }
+}
+// ─── CUSTOM OFFERS ───────────────────────────
+Table custom_offers {
+  id                      varchar       [pk, note: 'ObjectId']
+  conversation_id         varchar       [not null, ref: > conversations.id]
+  sender_id               varchar       [not null, ref: > users.id]
+  receiver_id             varchar       [not null, ref: > users.id]
+  title                   varchar       [not null]
+  amount                  float         [not null]
+  currency                varchar       [default: 'USD']
+  
+  status                  offer_status  [default: 'pending']
+  accepted_at             timestamp     [default: null]
+  created_at              timestamp     [default: `now()`]
+} 
+
+Table project_attachments {
+  id              varchar          [pk, note: 'ObjectId']
+  // CRITICAL CHANGE: Nullable foreign key allows pre-sale document processing
+  project_id      varchar          [ref: > projects.id, default: null, note: 'NULL during pre-sale/negotiation. Updated with an ID once the offer is accepted.']
+  
+  uploaded_by     varchar          [not null, ref: > users.id, note: 'Tracks the owner regardless of project status']
+  name            varchar          [not null, note: 'e.g., unsigned_nda.pdf, custom_proposal_v1.pdf']
+  file_url        varchar          [not null, note: 'S3 / Cloud Storage Link']
+  file_size       int
+  mime_type       varchar
+  attachment_type varchar          [not null, note: 'nda | quotation | proposal | asset']
+  created_at      timestamp        [default: `now()`]
+  updated_at      timestamp        [default: `now()`]
+
+  Note: 'Master ledger for legal, financial, and strategic documents. Operates independently of project existence.'
+
+  Indexes {
+    project_id [name: 'idx_attach_project_id']
+    uploaded_by [name: 'idx_attach_uploader']
+    (project_id, attachment_type) [name: 'idx_attach_type_filter']
+  }
+}
+// ─── MESSAGE ATTACHMENTS (Scalable File Management) ───
+Table message_attachments {
+  id              varchar   [pk, note: 'ObjectId']
+  message_id      varchar   [not null, ref: > messages.id, note: 'Cascade deletes if message is deleted']
+  conversation_id varchar   [not null, ref: > conversations.id, note: 'Denormalized to pull chat media galleries instantly without checking messages']
+  file_name       varchar   [not null, note: 'e.g., brief_deck.pdf, audio_memo.mp3']
+  file_url        varchar   [not null, note: 'S3, Cloudinary, or GCP storage secure endpoint']
+  file_size       int       [note: 'Size in bytes for UI presentation and system analytics']
+  mime_type       varchar   [note: 'e.g., image/jpeg, application/vnd.ms-excel']
+  uploaded_at     timestamp [default: `now()`]
+
+  Note: 'Supports multiple files per message. Separating files from message blocks prevents massive performance degradation.'
+
+  Indexes {
+    message_id [name: 'idx_msg_attach_id']
+    // Crucial for media tab features (e.g., "View all photos/docs sent in this conversation")
+    (conversation_id, mime_type) [name: 'idx_conv_media_gallery']
+  }
+}
+// ─── CONVERSATIONS (The Missing Piece) ───────
+Table conversations {
+  id                varchar         [pk, note: 'ObjectId']
+  project_id        varchar         [ref: > projects.id, note: 'Null for non-project general/sales DMs']
+  channel           message_channel [not null, note: 'sales_client | internal_project | general_dm']
+  
+  // Denormalized fields for lightning-fast UI rendering
+  last_message_text text            [note: 'Denormalized: Snippet shown in the chat list view']
+  last_message_at   timestamp       [default: `now()`, note: 'Denormalized: Used to sort the chat list sidebar']
+  last_sender_id    varchar         [ref: > users.id]
+  
+  created_at        timestamp       [default: `now()`]
+  updated_at        timestamp       [default: `now()`]
+
+  Note: 'Represents a unique chat room/thread. Drastically improves list lookups.'
+
+  Indexes {
+    project_id [name: 'idx_conv_project_id']
+    last_message_at [name: 'idx_conv_sorting']
+  }
+} 
+
+// Junction table to link Users to Conversations (Handles Group & 1-on-1 chats)
+Table conversation_participants {
+  id              varchar [pk, note: 'ObjectId']
+  conversation_id varchar [not null, ref: > conversations.id]
+  user_id         varchar [not null, ref: > users.id]
+  joined_at       timestamp [default: `now()`]
+  
+  // Denormalized unread tracking per user
+  unread_count    int     [default: 0, note: 'Incremented via hook on new message']
+
+  Indexes {
+    (user_id, conversation_id) [unique, name: 'idx_participant_lookup']
+    conversation_id [name: 'idx_conv_participants']
+  }
+}
+
+
+// ─── BOOKING S ────────────────────────────────
+// Dynamic status tracking for the booking lifecycle
+
+
+Table bookings {
+  id               varchar        [pk, note: 'ObjectId']
+  client_id        varchar        [not null, ref: > clients.id]
+  
+  // NULLABLE INITIALIZATION: Null when requested from the website; binds to the user who accepts it
+  sales_member_id  varchar        [ref: > users.id, default: null, note: 'Null when initial request comes from website. Set when a sales person accepts it.']
+  
+  project_id       varchar        [ref: > projects.id, default: null, note: 'Optional: Linked if call is about an ongoing project']
+  
+  // ZOOM INTEGRATION METADATA (Populated AFTER sales person accepts)
+  zoom_meeting_id  varchar        [unique, default: null]
+  zoom_join_url    varchar        [default: null, note: 'The link dispatched to client via email/chat']
+  zoom_host_url    varchar        [default: null, note: 'The link used by the sales person to start the meeting']
+  zoom_password    varchar        [default: null]
+  
+  status           booking_status [default: 'requested']
+  scheduled_at     timestamp      [not null, note: 'The specific date/time slot requested by the client']
+  duration_minutes int            [default: 30]
+  
+  created_at       timestamp      [default: `now()`]
+  updated_at       timestamp      [default: `now()`]
+
+  Note: 'Manages incoming client inbound calls. Decouples creation from Zoom scheduling allocation.'
+
+  Indexes {
+    status [name: 'idx_bookings_status']
+    scheduled_at [name: 'idx_bookings_time_slot']
+    (client_id, status) [name: 'idx_bookings_client_lookup']
+    (sales_member_id, status) [name: 'idx_bookings_sales_triage', note: 'Speeds up internal dashboard queues for pending requests']
+  }
+}
+
+// ─── AUDIT LOGS ──────────────────────────────
+
+Table audit_logs {
+  id          varchar [pk, note: 'ObjectId']
+  actor_id    varchar [not null, ref: > users.id]
+  action      varchar [not null, note: 'e.g. project.status_changed, booking.created']
+  entity_type varchar [not null, note: 'Collection name: projects, bookings, users…']
+  entity_id   varchar [not null]
+  payload     varchar [note: 'JSON string — before/after snapshot']
+  ip_address  varchar
+  created_at  timestamp [default: `now()`]
+
+  Note: 'Append-only. Never updated. Visible to superadmin and admin only.'
+}
+
+
+// ─── ANALYTICS SNAPSHOTS ─────────────────────
+
+Table analytics_snapshots {
+  id            varchar          [pk, note: 'ObjectId']
+  snapshot_date timestamp        [not null]
+  period        analytics_period [not null]
+  scope         varchar          [not null, note: '"global" | teamId | userId']
+
+  // Revenue
+  revenue_total    float [default: 0]
+  currency         varchar [default: 'USD']
+
+  // Projects
+  projects_total    int [default: 0]
+  projects_pending  int [default: 0]
+  projects_active   int [default: 0]
+  projects_on_hold  int [default: 0]
+  projects_complete int [default: 0]
+  projects_new      int [default: 0]
+
+  // Subscriptions
+  subscriptions_new       int [default: 0]
+  subscriptions_cancelled int [default: 0]
+  subscriptions_active    int [default: 0]
+
+  created_at timestamp [default: `now()`]
+
+  Note: 'Pre-aggregated for admin/HTO dashboards. Avoids heavy real-time aggregations. scope = "global" for platform-wide; teamId/userId for scoped views.'
+}
+ 
+
+Ref: "users"."role" - "roles"."id"

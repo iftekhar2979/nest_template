@@ -6,9 +6,16 @@ export const envSchema = Joi.object({
     .default("development"),
   PORT: Joi.number().default(8080),
 
-  DB_URL: Joi.string().required(),
+  DB_HOST: Joi.string().required(),
+  DB_PORT: Joi.number().default(3306),
+  DB_USERNAME: Joi.string().required(),
+  DB_PASSWORD: Joi.string().allow("").required(),
+  DB_NAME: Joi.string().required(),
 
   JWT_SECRET: Joi.string().required(),
+  JWT_REFRESH_SECRET: Joi.string().optional(),
+  ACCESS_TOKEN_EXPIRY: Joi.string().default("15m"),
+  REFRESH_TOKEN_EXPIRY: Joi.string().default("30d"),
   EXPIRES_IN: Joi.string().default("30d"),
 
   SMTP_USER: Joi.string().required(),
@@ -34,11 +41,18 @@ export const envSchema = Joi.object({
   ADMIN_PASSWORD: Joi.string().required(),
   ADMIN_ROLE: Joi.string().required(),
   ADMIN_NAME: Joi.string().required(),
-  ADMIN_PROFILE_PICTURE: Joi.string().required(),
-  ADMIN_PHONE: Joi.string().required(),
+  // ADMIN_PROFILE_PICTURE: Joi.string().required(),
+  // ADMIN_PHONE: Joi.string().required(),
+  SUPER_ADMIN_EMAIL: Joi.string().email().optional(),
+  SUPER_ADMIN_PASSWORD: Joi.string().optional(),
+  SUPER_ADMIN_NAME: Joi.string().optional(),
+  SUPER_ADMIN_PHONE: Joi.string().allow("").optional(),
 
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(10),
+
+  // Shared secret for biometric/device punch ingestion (x-device-api-key header)
+  DEVICE_API_KEY: Joi.string().optional(),
 
   GOOGLE_CLIENT_ID: Joi.string().optional(),
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),

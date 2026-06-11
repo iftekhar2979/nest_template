@@ -1,13 +1,10 @@
 // src/user/user.service.ts
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Settings } from 'src/settings/settings.schema';
 import { SettingsService } from 'src/settings/settings.service';
-import { CreateUserDto } from 'src/users/dto/createUser.dto';
-import { IUser } from 'src/users/users.interface';
 import { UserService } from 'src/users/users.service';
+import { RoleRepository } from '../auth/repositories/role.repository';
+import { RoleType, UserStatus } from '../users/schema/users.schema';
 
 @Injectable()
 export class SeederService {
@@ -15,36 +12,121 @@ export class SeederService {
     private readonly userService: UserService,
     private readonly settingService: SettingsService,
     private readonly configService: ConfigService,
+    private readonly roleRepository: RoleRepository,
   ) {}
 
+  async seedAuthData() {
+    await this.seedRoles();
+    await this.seedAdminUser();
+  }
+
+  async seedRoles() {
+    const roleSeeds: Array<{ id: RoleType; permissions: string[]; description: string }> = [
+      {
+        id: RoleType.SUPERADMIN,
+        permissions: ['*'],
+        description: 'Unrestricted platform owner access',
+      },
+      {
+        id: RoleType.ADMIN,
+        permissions: [
+          'read:*',
+          'write:*',
+          'manage:users',
+          'manage:departments',
+          'manage:designations',
+          'manage:shifts',
+          'manage:attendance',
+          'manage:holidays',
+        ],
+        description: 'Administrative access across operational modules',
+      },
+      {
+        id: RoleType.HTO,
+        permissions: ['read:*', 'manage:departments', 'manage:projects'],
+        description: 'Head of team operations access',
+      },
+      {
+        id: RoleType.SALES_LEADER,
+        permissions: ['read:sales', 'write:sales', 'manage:sales_team'],
+        description: 'Sales department leadership access',
+      },
+      {
+        id: RoleType.SALES_TEAM_LEADER,
+        permissions: ['read:sales', 'write:sales', 'manage:sales_members'],
+        description: 'Sales team leadership access',
+      },
+      {
+        id: RoleType.SALES_MEMBER,
+        permissions: ['read:sales', 'write:sales'],
+        description: 'Sales member access',
+      },
+      {
+        id: RoleType.OPERATION_LEADER,
+        permissions: ['read:operations', 'write:operations', 'manage:operation_team'],
+        description: 'Operations leadership access',
+      },
+      {
+        id: RoleType.OPERATION_MEMBER,
+        permissions: ['read:operations', 'write:operations'],
+        description: 'Operations member access',
+      },
+      {
+        id: RoleType.EMPLOYEE,
+        permissions: [
+          'read:own_profile',
+          'write:own_profile',
+          'read:own_attendance',
+          'write:own_attendance',
+          'write:own_requests',
+          'read:own_requests',
+        ],
+        description: 'Employee self-service attendance access',
+      },
+      {
+        id: RoleType.CLIENT,
+        permissions: ['read:own_profile', 'read:own_projects', 'write:own_messages'],
+        description: 'Client account access',
+      },
+    ];
+
+    for (const role of roleSeeds) {
+      await this.roleRepository.upsert(role.id, role.permissions, role.description);
+    }
+  }
+
   async seedAdminUser() {
-    const adminEmail = this.configService.get<string>('ADMIN_EMAIL'); 
-    const existingAdmin = await this.userService.findByEmail(adminEmail);
+    const adminEmail = (
+      this.configService.get<string>('SUPER_ADMIN_EMAIL') ||
+      this.configService.get<string>('ADMIN_EMAIL')
+    )?.toLowerCase().trim();
+    const existingAdmin = await this.userService.findByEmailIncludingInactive(adminEmail);
 
     if (!existingAdmin) {
       const adminDto : {
         email:string,
-        password:string,
-        userName:string,
-        role:string,
+        passwordHash:string,
+        role:RoleType,
         fullName:string,
-        image:string,
-        phone:string,
+        avatarUrl:string,
+        phoneNumber:string,
         isEmailVerified:boolean
+        isTcPpAccepted:boolean
+        status: UserStatus
       } = {
         email: adminEmail,
-        userName:'untold_secret',
-        password: this.configService.get<string>('ADMIN_PASSWORD'), 
-        role: this.configService.get<string>('ADMIN_ROLE'), 
-        fullName: this.configService.get<string>('ADMIN_NAME'),
-        image: this.configService.get<string>('ADMIN_PROFILE_PICTURE'),
-        phone: this.configService.get<string>('ADMIN_PHONE'),
+        passwordHash: this.configService.get<string>('SUPER_ADMIN_PASSWORD') || this.configService.get<string>('ADMIN_PASSWORD'),
+        role: RoleType.SUPERADMIN,
+        fullName: this.configService.get<string>('SUPER_ADMIN_NAME') || this.configService.get<string>('ADMIN_NAME'),
+        avatarUrl: this.configService.get<string>('ADMIN_PROFILE_PICTURE'),
+        phoneNumber: this.configService.get<string>('SUPER_ADMIN_PHONE') || this.configService.get<string>('ADMIN_PHONE'),
         isEmailVerified: true,
+        isTcPpAccepted: true,
+        status: UserStatus.ACTIVE,
       };
 
       await this.userService.createUser(adminDto);
 
-      // await this.userService.create(adminDto);
       console.log('Admin created successfully!');
     } else {
       console.log('Admin user already exists.');

@@ -2,36 +2,86 @@ import {
   Injectable,
   ExecutionContext,
   ForbiddenException,
+  CanActivate,
+  UnauthorizedException,
 } from '@nestjs/common';
-import { JwtAuthGuard } from './jwt-auth.guard'; // Import the JwtAuthGuard
-import { Reflector } from '@nestjs/core'; // Reflector to retrieve metadata (role) from the route handler
-import { JwtService } from '@nestjs/jwt';
-import { UserService } from 'src/users/users.service';
+import { Reflector } from '@nestjs/core';
+import {
+  PERMISSIONS_KEY,
+  ROLES_KEY,
+} from '../../common/custom-decorator/role.decorator';
+import { RoleType } from '../../users/schema/users.schema';
+
+type AuthenticatedUser = {
+  role?: RoleType;
+  permissions?: string[];
+};
 
 @Injectable()
-export class RolesGuard extends JwtAuthGuard {
-  constructor(
-    private readonly reflector: Reflector, // Inject Reflector to get roles from metadata
-    jwtService: JwtService, // Inject JwtService
-    userService: UserService, // Inject UserService
-  ) {
-    super(jwtService, userService); // Pass the dependencies to the parent (JwtAuthGuard)
+export class RolesGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const roles = this.reflector.getAllAndOverride<RoleType[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+      PERMISSIONS_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (!roles?.length && !requiredPermissions?.length) {
+      throw new ForbiddenException('Access policy is not configured');
+    }
+
+    const request = context.switchToHttp().getRequest();
+    const user = request.user as AuthenticatedUser | undefined;
+    if (!user) {
+      throw new UnauthorizedException('Authentication required');
+    }
+
+    if (roles?.length && (!user.role || !roles.includes(user.role))) {
+      throw new ForbiddenException('Insufficient role');
+    }
+
+    if (
+      requiredPermissions?.length &&
+      !this.hasPermissions(user.permissions ?? [], requiredPermissions)
+    ) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
+
+    return true;
   }
 
-  // Override the canActivate method to check for roles
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Get the roles from the route metadata
-    const roles = this.reflector.get<string[]>('roles', context.getHandler());
-    // console.log(context);
-    if (!roles) {
-      return true; // If no roles are specified, proceed with the request
+  private hasPermissions(
+    userPermissions: string[],
+    requiredPermissions: string[],
+  ): boolean {
+    if (userPermissions.includes('*')) {
+      return true;
     }
-    const request = context.switchToHttp().getRequest();
-    const user = request.user; 
-    const hasRole = roles.some((role) => user.role?.includes(role));
-    if (!hasRole) {
-      throw new ForbiddenException('You do not have the required role !'); // If the user doesn't have the role, throw ForbiddenException
+
+    return requiredPermissions.every((requiredPermission) =>
+      userPermissions.some((userPermission) =>
+        this.permissionMatches(userPermission, requiredPermission),
+      ),
+    );
+  }
+
+  private permissionMatches(
+    userPermission: string,
+    requiredPermission: string,
+  ): boolean {
+    if (userPermission === requiredPermission) {
+      return true;
     }
-    return true; // If the user has the required role, proceed with the request
+
+    if (!userPermission.endsWith(':*')) {
+      return false;
+    }
+
+    return requiredPermission.startsWith(userPermission.slice(0, -1));
   }
 }

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
@@ -10,32 +10,30 @@ import { CreateUserDto } from './dto/createUser.dto';
 
 describe('UserService', () => {
   let service: UserService;
-  let model: Model<User>;
+  let repo: Repository<User>;
 
   beforeEach(async () => {
-    const mockSave = jest.fn().mockResolvedValue({
-      _id: '123abc',
-      fullName: 'John Doe',
-      email: 'john@example.com',
-    });
-
-    const mockModel = function (this: any, dto: any) {
-      Object.assign(this, dto);
-      this.save = mockSave;
+    const mockRepo = {
+      create: jest.fn((dto: any) => dto),
+      save: jest.fn().mockResolvedValue({
+        id: '123abc',
+        fullName: 'John Doe',
+        email: 'john@example.com',
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UserService,
         {
-          provide: getModelToken(User.name),
-          useValue: mockModel,
+          provide: getRepositoryToken(User),
+          useValue: mockRepo,
         },
       ],
     }).compile();
 
     service = module.get<UserService>(UserService);
-    model = module.get<Model<User>>(getModelToken(User.name));
+    repo = module.get<Repository<User>>(getRepositoryToken(User));
   });
 
   it('should validate and create a new user', async () => {
@@ -71,13 +69,13 @@ describe('UserService', () => {
 
     expect(result).toEqual(
       expect.objectContaining({
-        _id: expect.any(String),
+        id: expect.any(String),
         fullName: 'John Doe',
         email: 'john@example.com',
       }),
     );
 
     // Also check that save was called
-    expect(model.prototype.save).toHaveBeenCalled();
+    expect(repo.save).toHaveBeenCalled();
   });
 });

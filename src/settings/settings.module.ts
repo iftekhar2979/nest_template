@@ -1,14 +1,12 @@
 import { Module } from '@nestjs/common';
 import { SettingsController } from './settings.controller';
 import { SettingsService } from './settings.service';
-import { MongooseModule } from '@nestjs/mongoose';
-import { Settings, SettingsSchema } from './settings.schema';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Settings } from './settings.schema';
 
 @Module({
   imports:[
-        MongooseModule.forFeature([
-          { name: Settings.name, schema: SettingsSchema },
-        ]),
+        TypeOrmModule.forFeature([Settings]),
   ],
   controllers: [SettingsController],
   providers: [SettingsService],

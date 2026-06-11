@@ -1,78 +1,60 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Settings } from '././settings.schema';
-import { ResponseInterceptor } from 'src/common/interceptors/response.interceptors';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Settings } from './settings.schema';
 
 @Injectable()
 export class SettingsService {
   constructor(
-    @InjectModel(Settings.name) private settingModel: Model<Settings>,
+    @InjectRepository(Settings)
+    private readonly settingRepo: Repository<Settings>,
   ) {}
 
   async seed(seedData: any): Promise<any> {
     for (const data of seedData) {
-      const existing = await this.settingModel
-        .findOne({ key: data.key })
-        .exec();
+      const existing = await this.settingRepo.findOne({
+        where: { key: data.key },
+      });
       if (!existing) {
-        await this.settingModel.create(data);
+        await this.settingRepo.save(this.settingRepo.create(data));
         console.log(`Seeded: ${data.key}`);
       } else {
         console.log(`Already exists: ${data.key}`);
       }
     }
   }
+
   async getTermsAndConditions(): Promise<any> {
-    return await this.settingModel
-      .findOne({ key: 'terms_and_condition' })
-      .exec();
+    return this.settingRepo.findOne({ where: { key: 'terms_and_condition' } });
   }
 
   async getAboutUs(): Promise<any> {
-    return await this.settingModel.findOne({ key: 'about_us' }).exec();
+    return this.settingRepo.findOne({ where: { key: 'about_us' } });
   }
 
   async getPrivacyPolicy(): Promise<any> {
-    return await this.settingModel.findOne({ key: 'privacy_policy' }).exec();
+    return this.settingRepo.findOne({ where: { key: 'privacy_policy' } });
   }
 
   async editTermsAndConditions(content: string): Promise<void> {
-    const sanitizedContent = content;
-    let find = await this.settingModel.findOne({ key: 'terms_and_condition' });
- ;
-    find.content = sanitizedContent;
- 
-    find.save();
+    const find = await this.settingRepo.findOne({
+      where: { key: 'terms_and_condition' },
+    });
+    find.content = content;
+    await this.settingRepo.save(find);
   }
 
   async editAboutUs(content: string): Promise<void> {
-    const sanitizedContent = content;
-    let find = await this.settingModel.findOne({ key: 'about_us' });
-    console.log(find);
-    // await this.settingModel
-    //   .updateOne(
-    //     { key: 'about_us' },
-    //     { value: sanitizedContent },
-    //     { upsert: true ,new:true},
-    //   )
-    //   .exec();
-    find.content = sanitizedContent;
-    find.save();
+    const find = await this.settingRepo.findOne({ where: { key: 'about_us' } });
+    find.content = content;
+    await this.settingRepo.save(find);
   }
 
   async editPrivacyPolicy(content: string): Promise<void> {
-    const sanitizedContent = content;
-    let find = await this.settingModel.findOne({ key: 'privacy_policy' });
-    console.log(find);
-    find.content = sanitizedContent;
-    // await this.settingModel
-    //   .updateOne(
-    //     { key: 'privacy_policy' },
-    //     { value: sanitizedContent },
-    //     { upsert: true , new:true},
-    //   )
-    //   .exec();
-    find.save();
+    const find = await this.settingRepo.findOne({
+      where: { key: 'privacy_policy' },
+    });
+    find.content = content;
+    await this.settingRepo.save(find);
   }
 }
