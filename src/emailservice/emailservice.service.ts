@@ -2,7 +2,17 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config'; // If you are using environment variables
 
-const configService = new ConfigService()
+const configService = new ConfigService();
+const BRAND_NAME = 'Ilmify Tech Agency';
+const SUPPORT_EMAIL =
+  configService.get<string>('SUPPORT_EMAIL') || 'support@ilmifytech.com';
+const WEBSITE_URL =
+  configService.get<string>('WEBSITE_URL') || 'https://ilmifytech.com';
+const PRIVACY_URL =
+  configService.get<string>('PRIVACY_URL') || `${WEBSITE_URL}/privacy-policy`;
+const TERMS_URL =
+  configService.get<string>('TERMS_URL') || `${WEBSITE_URL}/terms`;
+
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter;
@@ -17,7 +27,6 @@ export class EmailService {
     });
   }
 
-
   // Function to send OTP email
   async sendOtpEmail(to: string, otp: string, userName: string) {
     const htmlTemplate = this.getOtpHtmlTemplate(userName, otp);
@@ -25,7 +34,7 @@ export class EmailService {
     const mailOptions = {
       from: process.env.SMTP_USER,
       to,
-      subject: 'Untold Secret OTP for Registration',
+      subject: `${BRAND_NAME} email verification code`,
       html: htmlTemplate,
     };
     try {
@@ -39,6 +48,9 @@ export class EmailService {
 
   // Function to generate the HTML template with the OTP embedded
   private getOtpHtmlTemplate(userName: string, otp: string): string {
+    const safeUserName = this.escapeHtml(userName || 'there');
+    const safeOtp = this.escapeHtml(otp);
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -47,10 +59,11 @@ export class EmailService {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
               body {
-                  font-family: Arial, sans-serif;
+                  font-family: Arial, Helvetica, sans-serif;
                   margin: 0;
-                  padding: 0;
+                  padding: 24px 12px;
                   background-color: #f4f7fc;
+                  color: #172033;
               }
               .email-container {
                   width: 100%;
@@ -58,44 +71,49 @@ export class EmailService {
                   margin: 0 auto;
                   background-color: #ffffff;
                   border-radius: 8px;
-                  padding: 20px;
-                  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                  overflow: hidden;
+                  border: 1px solid #e6eaf2;
               }
               .email-header {
                   text-align: center;
-                  margin-bottom: 20px;
+                  padding: 28px 24px;
+                  background-color: #101828;
               }
               .email-header h1 {
-                  color: #5a4fcf;
-                  font-size: 32px;
+                  color: #ffffff;
+                  font-size: 24px;
                   margin: 0;
+                  letter-spacing: 0;
               }
               .email-body {
                   font-size: 16px;
-                  line-height: 1.5;
-                  color: #333;
+                  line-height: 1.6;
+                  color: #344054;
+                  padding: 28px 24px 8px;
               }
               .email-body p {
                   margin-bottom: 15px;
               }
               .email-body .otp-container {
                   text-align: center;
-                  background-color: #f1f1f1;
-                  padding: 15px;
-                  border-radius: 5px;
-                  font-size: 24px;
+                  background-color: #f8fafc;
+                  border: 1px solid #d0d5dd;
+                  padding: 18px;
+                  border-radius: 8px;
+                  font-size: 30px;
                   font-weight: bold;
-                  color: #333;
-                  margin-bottom: 20px;
+                  color: #101828;
+                  letter-spacing: 6px;
+                  margin: 24px 0;
               }
               .email-footer {
                   text-align: center;
-                  margin-top: 20px;
+                  padding: 20px 24px 28px;
                   font-size: 12px;
-                  color: #999;
+                  color: #667085;
               }
               .email-footer a {
-                  color: #5a4fcf;
+                  color: #175cd3;
                   text-decoration: none;
               }
           </style>
@@ -103,27 +121,36 @@ export class EmailService {
       <body>
           <div class="email-container">
               <div class="email-header">
-                  <h1>Untold Secret OTP Verification</h1>
+                  <h1>${BRAND_NAME}</h1>
               </div>
   
               <div class="email-body">
-                  <p>Dear <strong>${userName}</strong>,</p>
-                  <p>Thank you for registering on Untold Secret! To complete your registration, please verify your email address by entering the One-Time Password (OTP) below:</p>
+                  <p>Hi <strong>${safeUserName}</strong>,</p>
+                  <p>Use this one-time verification code to finish securing your ${BRAND_NAME} account:</p>
                   <div class="otp-container">
-                      <strong>${otp}</strong>
+                      <strong>${safeOtp}</strong>
                   </div>
-                  <p>The OTP is valid for the next 10 minutes. If you didn't request this OTP, please ignore this email.</p>
-                  <p>If you have any questions or need help, feel free to contact us at <a href="mailto:support@vibelyapp.com">support@vibelyapp.com</a>.</p>
+                  <p>This code expires in 3 minutes. If you did not request it, you can safely ignore this email.</p>
+                  <p>Need help? Contact us at <a href="mailto:${SUPPORT_EMAIL}">${SUPPORT_EMAIL}</a>.</p>
               </div>
   
               <div class="email-footer">
-                  <p>The <strong>Untold Secret Team</strong></p>
-                  <p><a href="https://vibelyapp.com" target="_blank">Visit Untold Secret</a> | <a href="https://vibelyapp.com/privacy-policy" target="_blank">Privacy Policy</a> | <a href="https://vibelyapp.com/terms" target="_blank">Terms of Service</a></p>
+                  <p>The <strong>${BRAND_NAME}</strong> team</p>
+                  <p><a href="${WEBSITE_URL}" target="_blank">Visit ${BRAND_NAME}</a> | <a href="${PRIVACY_URL}" target="_blank">Privacy Policy</a> | <a href="${TERMS_URL}" target="_blank">Terms of Service</a></p>
                   <p>This is an automated email, please do not reply directly to this message.</p>
               </div>
           </div>
       </body>
       </html>
     `;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }
