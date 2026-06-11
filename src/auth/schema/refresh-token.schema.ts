@@ -1,26 +1,32 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose from 'mongoose';
+import { Column, Entity, Index } from 'typeorm';
 import { Base } from '../../common/schema/base.schema';
 
-@Schema()
+@Entity('refresh_tokens')
+@Index('idx_refresh_token_user_active', ['userId', 'isRevoked', 'expiresAt'])
 export class RefreshToken extends Base {
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  })
-  userId: mongoose.Schema.Types.ObjectId;
+  @Index('idx_refresh_token_user_id')
+  @Column({ type: 'varchar', length: 36 })
+  userId: string;
 
-  @Prop({ required: true, unique: true })
-  token: string; // Hashed refresh token
+  @Index('idx_refresh_token_hash', { unique: true })
+  @Column({ type: 'varchar', select: false, unique: true })
+  tokenHash: string;
 
-  @Prop({ required: true })
+  @Column({ type: 'datetime' })
   expiresAt: Date;
 
-  @Prop({ default: false })
+  @Column({ type: 'boolean', default: false })
   isRevoked: boolean;
+
+  @Column({ type: 'datetime', nullable: true, default: null })
+  revokedAt: Date;
+
+  @Column({ type: 'varchar', default: '' })
+  replacedByTokenHash: string;
+
+  @Column({ type: 'varchar', default: '' })
+  createdByIp: string;
+
+  @Column({ type: 'varchar', default: '' })
+  userAgent: string;
 }
-
-export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
-
-RefreshToken.applyBaseHooks(RefreshTokenSchema);

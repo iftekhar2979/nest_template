@@ -2,8 +2,9 @@ node_modules
 dist
 .git
 .env
+.env.*
 .dockerignore
-pnpm-lock.yaml
+docker-compose.yml
 package-lock.json
 *.md
 test
