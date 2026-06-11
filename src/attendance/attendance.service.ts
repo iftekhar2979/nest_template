@@ -1,7 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Brackets, In, Repository } from 'typeorm';
 import { Employee, EmployeeStatus } from '../employees/schema/employee.schema';
+import {
+  LeaveLedgerEntry,
+  LeaveLedgerType,
+} from '../leave/schema/leave-ledger-entry.schema';
 import { HolidaysService } from '../holidays/holidays.service';
 import { Shift } from '../shifts/schema/shift.schema';
 import { ShiftsService } from '../shifts/shifts.service';
@@ -40,6 +45,15 @@ type ComputedMetrics = {
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
+  // How many past days each catch-up run will (re)finalize. Bounded so the
+  // hourly job stays cheap while still self-healing recent server downtime.
+  private static readonly FINALIZE_LOOKBACK_DAYS = 3;
+
+  // Guards against overlapping runs if a finalize pass outlasts the interval.
+  private finalizing = false;
+
   constructor(
     @InjectRepository(AttendanceRecord)
     private readonly recordRepo: Repository<AttendanceRecord>,
@@ -47,6 +61,8 @@ export class AttendanceService {
     private readonly punchRepo: Repository<AttendancePunch>,
     @InjectRepository(Employee)
     private readonly employeeRepo: Repository<Employee>,
+    @InjectRepository(LeaveLedgerEntry)
+    private readonly leaveLedgerRepo: Repository<LeaveLedgerEntry>,
     private readonly shiftsService: ShiftsService,
     private readonly holidaysService: HolidaysService,
     private readonly workweeksService: WorkweeksService,
@@ -616,6 +632,75 @@ export class AttendanceService {
     };
   }
 
+  // --- Scheduled finalization ---
+
+  /**
+   * Hourly self-healing finalizer. For each of the last
+   * FINALIZE_LOOKBACK_DAYS completed days, every active employee who still has
+   * no record for that day gets one created from their calendar: HOLIDAY,
+   * WEEKLY_OFF, ON_LEAVE, or ABSENT (resolved via resolveDerivedStatusForDay,
+   * which also accounts for shift swaps through the shift resolver). Employees
+   * who already punched own a record and are left untouched, so the job is
+   * idempotent — once a day is fully finalized later runs do almost nothing.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async finalizeRecentAttendance(): Promise<{ finalized: number }> {
+    if (this.finalizing) {
+      return { finalized: 0 };
+    }
+    this.finalizing = true;
+    let finalized = 0;
+    try {
+      const today = new Date();
+      for (let i = 1; i <= AttendanceService.FINALIZE_LOOKBACK_DAYS; i += 1) {
+        const day = new Date(today);
+        day.setDate(day.getDate() - i);
+        finalized += await this.finalizeDay(this.toDateString(day));
+      }
+      if (finalized > 0) {
+        this.logger.log(
+          `Attendance finalizer created ${finalized} record(s)`,
+        );
+      }
+    } catch (err) {
+      this.logger.error('Attendance finalizer failed', err as Error);
+    } finally {
+      this.finalizing = false;
+    }
+    return { finalized };
+  }
+
+  /**
+   * Create missing records for one completed day. Only active employees with
+   * no record yet are touched; the status for each is resolved from holiday /
+   * weekly-off / leave, defaulting to ABSENT.
+   */
+  private async finalizeDay(date: string): Promise<number> {
+    const missing = await this.employeeRepo
+      .createQueryBuilder('e')
+      .leftJoin(
+        AttendanceRecord,
+        'r',
+        'r.userId = e.userId AND r.date = :date',
+        { date },
+      )
+      .where('e.employeeStatus = :active', { active: EmployeeStatus.ACTIVE })
+      .andWhere('r.id IS NULL')
+      .select('e.userId', 'userId')
+      .getRawMany<{ userId: string }>();
+
+    for (const { userId } of missing) {
+      await this.applyRecord({
+        userId,
+        date,
+        checkInAt: null,
+        checkOutAt: null,
+        source: AttendanceSource.SYSTEM,
+      });
+    }
+    return missing.length;
+  }
+
   async manualCorrection(
     dto: ManualCorrectionDto,
     actorId?: string,
@@ -943,7 +1028,23 @@ export class AttendanceService {
       userId,
       date,
     );
-    return workDay.isWeeklyOff ? AttendanceStatus.WEEKLY_OFF : baseStatus;
+    if (workDay.isWeeklyOff) {
+      return AttendanceStatus.WEEKLY_OFF;
+    }
+    if (await this.isUserOnLeave(userId, date)) {
+      return AttendanceStatus.ON_LEAVE;
+    }
+    return baseStatus;
+  }
+
+  // Treats a leave-ledger USAGE entry dated this day as "on leave". Best-effort:
+  // the ledger has no per-day expansion, so multi-day leave booked as a single
+  // entry only marks its entryDate.
+  private async isUserOnLeave(userId: string, date: string): Promise<boolean> {
+    const count = await this.leaveLedgerRepo.count({
+      where: { userId, entryType: LeaveLedgerType.USAGE, entryDate: date },
+    });
+    return count > 0;
   }
 
   /**

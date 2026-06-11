@@ -30,6 +30,7 @@ import { WorkweeksModule } from './workweeks/workweeks.module';
 import { WebhookModule } from './webhook/webhook.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
       validationSchema: envSchema,
     }),
     WinstonModule.forRoot(winstonLoggerConfig),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

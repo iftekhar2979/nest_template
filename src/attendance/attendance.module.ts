@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ShiftsModule } from '../shifts/shifts.module';
 import { HolidaysModule } from '../holidays/holidays.module';
 import { Employee } from '../employees/schema/employee.schema';
+import { LeaveLedgerEntry } from '../leave/schema/leave-ledger-entry.schema';
 import { WorkweeksModule } from '../workweeks/workweeks.module';
 import { AttendanceRecord } from './schema/attendance.schema';
 import { AttendancePunch } from './schema/attendance-punch.schema';
@@ -20,6 +21,7 @@ import { DeviceApiKeyGuard } from '../shared/guards/device-api-key.guard';
       AttendancePunch,
       AttendanceRequest,
       Employee,
+      LeaveLedgerEntry,
     ]),
     ShiftsModule,
     HolidaysModule,
