@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Brackets, In, Repository } from 'typeorm';
-import { Employee } from '../employees/schema/employee.schema';
+import { Employee, EmployeeStatus } from '../employees/schema/employee.schema';
 import { HolidaysService } from '../holidays/holidays.service';
 import { Shift } from '../shifts/schema/shift.schema';
 import { ShiftsService } from '../shifts/shifts.service';
@@ -17,14 +17,18 @@ import {
   PunchType,
 } from './schema/attendance-punch.schema';
 import {
+  AttendanceOverviewQueryDto,
+  AttendanceOverviewStatus,
   AttendanceQueryDto,
   BulkCorrectionDto,
   CheckInOutDto,
   ManualCorrectionDto,
   PunchDto,
+  PunchQueryDto,
+  SortOrder,
   ZktecoPunchDto,
 } from './dto/attendance.dto';
-import { PaginationRequest } from '../shared/utils/pagination';
+import { pagination } from '../shared/utils/pagination';
 
 type ComputedMetrics = {
   workedMinutes: number;
@@ -376,15 +380,240 @@ export class AttendanceService {
     const page = query.page || 1;
     const limit = query.limit || 10;
     const skip = (page - 1) * limit;
+    const sort = query.sort === SortOrder.ASC ? 'ASC' : 'DESC';
 
     const [data, total] = await qb
-      .orderBy('r.date', 'DESC')
+      .orderBy('r.date', sort)
       .addOrderBy('r.userId', 'ASC')
       .skip(skip)
       .take(limit)
       .getManyAndCount();
 
     return { data, total, page, limit };
+  }
+
+  /**
+   * Paginated raw-punch listing for admins. Joins user/employee/department so
+   * results can be searched by name/code and filtered by department, and
+   * ordered by the punch timestamp.
+   */
+  async findAllPunches(query: PunchQueryDto): Promise<{
+    data: AttendancePunch[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const qb = this.punchRepo.createQueryBuilder('p');
+
+    qb.leftJoin('p.user', 'u').addSelect([
+      'u.id',
+      'u.fullName',
+      'u.email',
+      'u.avatarUrl',
+    ]);
+    qb.leftJoin('u.employee', 'e').addSelect([
+      'e.id',
+      'e.employeeCode',
+      'e.employeeName',
+      'e.departmentId',
+    ]);
+    qb.leftJoin('e.department', 'd').addSelect(['d.id', 'd.departmentName']);
+
+    if (query.search) {
+      const term = `%${query.search}%`;
+      qb.andWhere(
+        new Brackets((inner) => {
+          inner
+            .where('u.fullName LIKE :term', { term })
+            .orWhere('e.employeeName LIKE :term', { term })
+            .orWhere('e.employeeCode LIKE :term', { term });
+        }),
+      );
+    }
+
+    if (query.userId)
+      qb.andWhere('p.userId = :userId', { userId: query.userId });
+    if (query.departmentId)
+      qb.andWhere('e.departmentId = :departmentId', {
+        departmentId: query.departmentId,
+      });
+    if (query.punchType)
+      qb.andWhere('p.punchType = :punchType', { punchType: query.punchType });
+    if (query.source)
+      qb.andWhere('p.source = :source', { source: query.source });
+    if (query.from)
+      qb.andWhere('p.punchedAt >= :from', {
+        from: new Date(`${query.from}T00:00:00`),
+      });
+    if (query.to)
+      qb.andWhere('p.punchedAt <= :to', {
+        to: new Date(`${query.to}T23:59:59.999`),
+      });
+
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+    const sort = query.sort === SortOrder.ASC ? 'ASC' : 'DESC';
+
+    const [data, total] = await qb
+      .orderBy('p.punchedAt', sort)
+      .skip(skip)
+      .take(limit)
+      .getManyAndCount();
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * Daily attendance overview for admins: headline counts (present / on-time /
+   * late / absent) plus a paginated per-employee list with check-in/out times
+   * and worked hours. Built from the active-employee roster LEFT JOINed onto
+   * the day's record, so employees with no punch at all are surfaced as absent
+   * (a record is only created once a punch or correction exists).
+   */
+  async getOverview(query: AttendanceOverviewQueryDto): Promise<{
+    date: string;
+    summary: {
+      total: number;
+      present: number;
+      onTime: number;
+      late: number;
+      absent: number;
+    };
+    data: Array<{
+      userId: string;
+      employeeCode: string;
+      employeeName: string;
+      fullName: string | null;
+      departmentName: string | null;
+      checkInAt: Date | null;
+      checkOutAt: Date | null;
+      status: AttendanceStatus;
+      workedMinutes: number;
+      workingHours: number;
+    }>;
+    pagination: ReturnType<typeof pagination>;
+  }> {
+    const date = query.date ?? this.toDateString(new Date());
+
+    // Active-employee roster joined to the day's record; search + department
+    // filters are shared by both the summary aggregate and the list.
+    const baseQb = () => {
+      const qb = this.employeeRepo
+        .createQueryBuilder('e')
+        .leftJoin('e.user', 'u')
+        .leftJoin('e.department', 'd')
+        .leftJoin(
+          AttendanceRecord,
+          'r',
+          'r.userId = e.userId AND r.date = :date',
+          { date },
+        )
+        .where('e.employeeStatus = :active', {
+          active: EmployeeStatus.ACTIVE,
+        });
+
+      if (query.search) {
+        const term = `%${query.search}%`;
+        qb.andWhere(
+          new Brackets((inner) => {
+            inner
+              .where('e.employeeName LIKE :term', { term })
+              .orWhere('e.employeeCode LIKE :term', { term })
+              .orWhere('u.fullName LIKE :term', { term });
+          }),
+        );
+      }
+      if (query.departmentId) {
+        qb.andWhere('e.departmentId = :departmentId', {
+          departmentId: query.departmentId,
+        });
+      }
+      return qb;
+    };
+
+    const summaryRaw = await baseQb()
+      .select('COUNT(*)', 'total')
+      .addSelect(
+        "SUM(CASE WHEN r.attendanceStatus IN ('present','late','half_day') THEN 1 ELSE 0 END)",
+        'present',
+      )
+      .addSelect(
+        "SUM(CASE WHEN r.attendanceStatus = 'present' THEN 1 ELSE 0 END)",
+        'onTime',
+      )
+      .addSelect(
+        "SUM(CASE WHEN r.attendanceStatus = 'late' THEN 1 ELSE 0 END)",
+        'late',
+      )
+      .addSelect(
+        "SUM(CASE WHEN (r.id IS NULL OR r.attendanceStatus = 'absent') THEN 1 ELSE 0 END)",
+        'absent',
+      )
+      .getRawOne();
+
+    const summary = {
+      total: Number(summaryRaw?.total) || 0,
+      present: Number(summaryRaw?.present) || 0,
+      onTime: Number(summaryRaw?.onTime) || 0,
+      late: Number(summaryRaw?.late) || 0,
+      absent: Number(summaryRaw?.absent) || 0,
+    };
+
+    const listQb = baseQb();
+    if (query.status === AttendanceOverviewStatus.PRESENT) {
+      listQb.andWhere(
+        "r.attendanceStatus IN ('present','late','half_day')",
+      );
+    } else if (query.status === AttendanceOverviewStatus.LATE) {
+      listQb.andWhere("r.attendanceStatus = 'late'");
+    } else if (query.status === AttendanceOverviewStatus.ABSENT) {
+      listQb.andWhere("(r.id IS NULL OR r.attendanceStatus = 'absent')");
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await listQb.clone().getCount();
+
+    const rows = await listQb
+      .select('e.userId', 'userId')
+      .addSelect('e.employeeCode', 'employeeCode')
+      .addSelect('e.employeeName', 'employeeName')
+      .addSelect('u.fullName', 'fullName')
+      .addSelect('d.departmentName', 'departmentName')
+      .addSelect('r.checkInAt', 'checkInAt')
+      .addSelect('r.checkOutAt', 'checkOutAt')
+      .addSelect('r.attendanceStatus', 'status')
+      .addSelect('r.workedMinutes', 'workedMinutes')
+      .orderBy('e.employeeName', 'ASC')
+      .offset(skip)
+      .limit(limit)
+      .getRawMany();
+
+    const data = rows.map((row) => {
+      const workedMinutes = Number(row.workedMinutes) || 0;
+      return {
+        userId: row.userId,
+        employeeCode: row.employeeCode,
+        employeeName: row.employeeName,
+        fullName: row.fullName ?? null,
+        departmentName: row.departmentName ?? null,
+        checkInAt: row.checkInAt ?? null,
+        checkOutAt: row.checkOutAt ?? null,
+        status: (row.status as AttendanceStatus) ?? AttendanceStatus.ABSENT,
+        workedMinutes,
+        workingHours: Math.round((workedMinutes / 60) * 100) / 100,
+      };
+    });
+
+    return {
+      date,
+      summary,
+      data,
+      pagination: pagination({ page, limit, total }),
+    };
   }
 
   async manualCorrection(

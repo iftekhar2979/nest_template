@@ -7,7 +7,6 @@ import { UserRepository } from '../users/users.repository';
 import { OtpRepository } from './repositories/otp.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { RoleRepository } from './repositories/role.repository';
-import { ClientRepository } from '../clients/clients.repository';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -20,7 +19,6 @@ describe('AuthService', () => {
         { provide: OtpRepository, useValue: {} },
         { provide: RefreshTokenRepository, useValue: {} },
         { provide: RoleRepository, useValue: {} },
-        { provide: ClientRepository, useValue: {} },
         { provide: JwtService, useValue: {} },
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: getQueueToken('EMAIL_QUEUE'), useValue: {} },

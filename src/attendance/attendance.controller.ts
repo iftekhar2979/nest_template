@@ -28,20 +28,18 @@ import { Roles } from 'src/common/custom-decorator/role.decorator';
 import { RoleType } from 'src/users/schema/users.schema';
 import { DeviceApiKeyGuard } from 'src/shared/guards/device-api-key.guard';
 import { PaginationInterceptor } from 'src/shared/interceptors/pagination.interceptor';
-import {
-  PaginationParams,
-  PaginationRequest,
-} from 'src/shared/utils/pagination';
 import { AttendanceService } from './attendance.service';
 import {
+  AttendanceOverviewQueryDto,
   AttendanceQueryDto,
   BatchPunchDto,
   BulkCorrectionDto,
   CheckInOutDto,
   ManualCorrectionDto,
   PunchDto,
+  PunchQueryDto,
 } from './dto/attendance.dto';
-import { AttendanceRecord } from './schema/attendance.schema';
+import { AttendanceRecord, AttendanceStatus } from './schema/attendance.schema';
 import { AttendancePunch } from './schema/attendance-punch.schema';
 
 class PaginationMetadata {
@@ -66,13 +64,84 @@ class AttendanceRecordPaginationResponse {
   pagination: PaginationMetadata;
 }
 
+class AttendancePunchPaginationResponse {
+  @ApiProperty({ type: [AttendancePunch] })
+  data: AttendancePunch[];
+
+  @ApiProperty({ type: PaginationMetadata })
+  pagination: PaginationMetadata;
+}
+
 class MessageResponse {
   @ApiProperty({ example: 'Operation successful' })
   message: string;
 }
 
+class AttendanceOverviewSummary {
+  @ApiProperty({ example: 120, description: 'Total active employees in scope' })
+  total: number;
+
+  @ApiProperty({ example: 100, description: 'Showed up (present, late, or half-day)' })
+  present: number;
+
+  @ApiProperty({ example: 85, description: 'Present and on time' })
+  onTime: number;
+
+  @ApiProperty({ example: 15, description: 'Arrived late' })
+  late: number;
+
+  @ApiProperty({ example: 20, description: 'No record for the day, or marked absent' })
+  absent: number;
+}
+
+class AttendanceOverviewRow {
+  @ApiProperty({ example: 'u1v2w3x4-y5z6-7a8b-c9d0-e1f2g3h4i5j6' })
+  userId: string;
+
+  @ApiProperty({ example: 'EMP-001' })
+  employeeCode: string;
+
+  @ApiProperty({ example: 'John Doe' })
+  employeeName: string;
+
+  @ApiProperty({ example: 'John Doe', nullable: true })
+  fullName: string | null;
+
+  @ApiProperty({ example: 'Engineering', nullable: true })
+  departmentName: string | null;
+
+  @ApiProperty({ example: '2024-06-09T09:00:00Z', nullable: true })
+  checkInAt: Date | null;
+
+  @ApiProperty({ example: '2024-06-09T18:00:00Z', nullable: true })
+  checkOutAt: Date | null;
+
+  @ApiProperty({ enum: AttendanceStatus, example: AttendanceStatus.PRESENT })
+  status: AttendanceStatus;
+
+  @ApiProperty({ example: 540 })
+  workedMinutes: number;
+
+  @ApiProperty({ example: 9, description: 'Worked hours (decimal, 2dp)' })
+  workingHours: number;
+}
+
+class AttendanceOverviewResponse {
+  @ApiProperty({ example: '2024-06-09' })
+  date: string;
+
+  @ApiProperty({ type: AttendanceOverviewSummary })
+  summary: AttendanceOverviewSummary;
+
+  @ApiProperty({ type: [AttendanceOverviewRow] })
+  data: AttendanceOverviewRow[];
+
+  @ApiProperty({ type: PaginationMetadata })
+  pagination: PaginationMetadata;
+}
+
 @ApiTags('Attendance')
-@ApiExtraModels(AttendanceRecord, AttendancePunch, AttendanceRecordPaginationResponse, MessageResponse)
+@ApiExtraModels(AttendanceRecord, AttendancePunch, AttendanceRecordPaginationResponse, AttendancePunchPaginationResponse, AttendanceOverviewResponse, MessageResponse)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
@@ -160,6 +229,43 @@ export class AttendanceController {
   })
   findAll(@Query() query: AttendanceQueryDto) {
     return this.attendanceService.findAll(query);
+  }
+
+  @Get('punches')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @UseInterceptors(PaginationInterceptor)
+  @ApiOperation({
+    summary: 'List all raw punches with employee details (admin)',
+    description:
+      'Search by employee name/code, filter by department, sort by punch timestamp.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Paginated list of punches.',
+    schema: { $ref: getSchemaPath(AttendancePunchPaginationResponse) },
+  })
+  findAllPunches(@Query() query: PunchQueryDto) {
+    return this.attendanceService.findAllPunches(query);
+  }
+
+  @Get('overview')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.SUPERADMIN)
+  @ApiOperation({
+    summary: 'Daily attendance overview (admin)',
+    description:
+      'Headline counts (present/on-time/late/absent) plus a paginated per-employee list. Filter by date, status, and department; search by employee name or code.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Attendance overview with summary counts and paginated list.',
+    schema: { $ref: getSchemaPath(AttendanceOverviewResponse) },
+  })
+  overview(@Query() query: AttendanceOverviewQueryDto) {
+    return this.attendanceService.getOverview(query);
   }
 
   @Post('correction')

@@ -224,6 +224,11 @@ export class BulkCorrectionDto {
 
 // --- Querying / export ---
 
+export enum SortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
+}
+
 export class AttendanceQueryDto {
   @ApiPropertyOptional({ description: 'Filter from date (YYYY-MM-DD)', example: '2024-06-01' })
   @IsOptional()
@@ -259,6 +264,131 @@ export class AttendanceQueryDto {
   @IsOptional()
   @IsEnum(AttendanceStatus)
   status?: AttendanceStatus;
+
+  @ApiPropertyOptional({
+    description: 'Sort order by date',
+    enum: SortOrder,
+    default: SortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sort?: SortOrder = SortOrder.DESC;
+
+  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  limit?: number = 10;
+}
+
+// --- Admin raw-punch listing ---
+
+export class PunchQueryDto {
+  @ApiPropertyOptional({ description: 'Search by user name, employee name, or employee code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by user UUID' })
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by department UUID' })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by punch type (in/out)', enum: PunchType })
+  @IsOptional()
+  @IsEnum(PunchType)
+  punchType?: PunchType;
+
+  @ApiPropertyOptional({ description: 'Filter by punch source', enum: PunchSource })
+  @IsOptional()
+  @IsEnum(PunchSource)
+  source?: PunchSource;
+
+  @ApiPropertyOptional({ description: 'Filter from date (YYYY-MM-DD)', example: '2024-06-01' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Filter to date (YYYY-MM-DD)', example: '2024-06-30' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @ApiPropertyOptional({
+    description: 'Sort order by punch timestamp',
+    enum: SortOrder,
+    default: SortOrder.DESC,
+  })
+  @IsOptional()
+  @IsEnum(SortOrder)
+  sort?: SortOrder = SortOrder.DESC;
+
+  @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page', example: 10, default: 10 })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(1000)
+  @Type(() => Number)
+  limit?: number = 10;
+}
+
+// --- Daily attendance overview ---
+
+export enum AttendanceOverviewStatus {
+  // "showed up" — present, late, or half-day records
+  PRESENT = 'present',
+  LATE = 'late',
+  // no record for the day, or a record explicitly marked absent
+  ABSENT = 'absent',
+}
+
+export class AttendanceOverviewQueryDto {
+  @ApiPropertyOptional({
+    description: 'Date to report on (YYYY-MM-DD); defaults to today',
+    example: '2024-06-09',
+  })
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @ApiPropertyOptional({ description: 'Search by employee name or code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by department UUID' })
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter the list by attendance state',
+    enum: AttendanceOverviewStatus,
+  })
+  @IsOptional()
+  @IsEnum(AttendanceOverviewStatus)
+  status?: AttendanceOverviewStatus;
 
   @ApiPropertyOptional({ description: 'Page number', example: 1, default: 1 })
   @IsOptional()
