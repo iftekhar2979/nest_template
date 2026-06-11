@@ -54,6 +54,10 @@ export class AttendanceService {
   // Guards against overlapping runs if a finalize pass outlasts the interval.
   private finalizing = false;
 
+  // Punches closer together than this are treated as one (accidental double
+  // scans / rapid re-taps), so a stray second punch isn't read as a check-out.
+  private static readonly PUNCH_DEBOUNCE_MINUTES = 5;
+
   constructor(
     @InjectRepository(AttendanceRecord)
     private readonly recordRepo: Repository<AttendanceRecord>,
@@ -866,8 +870,13 @@ export class AttendanceService {
       order: { punchedAt: 'ASC' },
     });
 
-    const ins = punches.filter((p) => p.punchType === PunchType.IN);
-    const outs = punches.filter((p) => p.punchType === PunchType.OUT);
+    // Collapse accidental rapid re-punches (double scans, taps within a few
+    // minutes) so a stray second punch isn't read as an early check-out — which
+    // would yield a tiny worked span and wrongly mark the day ABSENT.
+    const effective = this.dedupeClosePunches(punches);
+
+    const ins = effective.filter((p) => p.punchType === PunchType.IN);
+    const outs = effective.filter((p) => p.punchType === PunchType.OUT);
     const checkInAt = ins.length ? ins[0].punchedAt : null;
     const checkOutAt = outs.length ? outs[outs.length - 1].punchedAt : null;
 
@@ -877,10 +886,10 @@ export class AttendanceService {
       userId,
       date,
       metrics.derivedStatus,
-      punches.length > 0,
+      effective.length > 0,
     );
-    const source = punches.length
-      ? this.mapPunchSource(punches[punches.length - 1].source)
+    const source = effective.length
+      ? this.mapPunchSource(effective[effective.length - 1].source)
       : AttendanceSource.SYSTEM;
 
     return this.upsert(userId, date, {
@@ -1137,6 +1146,23 @@ export class AttendanceService {
       return null;
     }
     return this.shiftsService.findOne(workDay.pattern.defaultShiftId);
+  }
+
+  // Keep the first of any run of punches spaced under PUNCH_DEBOUNCE_MINUTES
+  // apart. Expects punches ordered by punchedAt ASC.
+  private dedupeClosePunches(punches: AttendancePunch[]): AttendancePunch[] {
+    const windowMs = AttendanceService.PUNCH_DEBOUNCE_MINUTES * 60000;
+    const kept: AttendancePunch[] = [];
+    for (const punch of punches) {
+      const last = kept[kept.length - 1];
+      if (
+        !last ||
+        punch.punchedAt.getTime() - last.punchedAt.getTime() >= windowMs
+      ) {
+        kept.push(punch);
+      }
+    }
+    return kept;
   }
 
   private toDateString(value: Date): string {
