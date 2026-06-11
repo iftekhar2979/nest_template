@@ -1,31 +1,73 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectRepository } from '@nestjs/typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { RefreshToken } from '../schema/refresh-token.schema';
-import { Types } from 'mongoose';
 
 @Injectable()
 export class RefreshTokenRepository {
-  constructor(@InjectModel(RefreshToken.name) private readonly refreshTokenModel: Model<RefreshToken>) { }
+  constructor(
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
+  ) {}
 
-  async create(data: any): Promise<RefreshToken> {
-    const newToken = new this.refreshTokenModel(data);
-    return await newToken.save();
+  async create(data: Partial<RefreshToken>): Promise<RefreshToken> {
+    return this.refreshTokenRepo.save(this.refreshTokenRepo.create(data));
   }
 
-  async findByToken(token: string): Promise<RefreshToken | null> {
-    return await this.refreshTokenModel.findOne({ token }).exec();
+  async findByTokenHash(tokenHash: string): Promise<RefreshToken | null> {
+    return this.refreshTokenRepo
+      .createQueryBuilder('rt')
+      .addSelect('rt.tokenHash')
+      .where('rt.tokenHash = :tokenHash', { tokenHash })
+      .getOne();
   }
 
-  async findActiveByUserId(userId: Types.ObjectId): Promise<RefreshToken[]> {
-    return await this.refreshTokenModel.find({ userId, isRevoked: false, expiresAt: { $gt: new Date() } }).exec();
+  async consumeActiveByTokenHash(
+    tokenHash: string,
+    replacedByTokenHash: string,
+  ): Promise<RefreshToken | null> {
+    const token = await this.refreshTokenRepo
+      .createQueryBuilder('rt')
+      .addSelect('rt.tokenHash')
+      .where('rt.tokenHash = :tokenHash', { tokenHash })
+      .andWhere('rt.isRevoked = false')
+      .andWhere('rt.expiresAt > :now', { now: new Date() })
+      .getOne();
+
+    if (!token) {
+      return null;
+    }
+
+    token.isRevoked = true;
+    token.revokedAt = new Date();
+    token.replacedByTokenHash = replacedByTokenHash;
+    return this.refreshTokenRepo.save(token);
   }
 
-  async revokeByToken(token: string): Promise<any> {
-    return await this.refreshTokenModel.findOneAndUpdate({ token }, { isRevoked: true }).exec();
+  async findActiveByUserId(userId: string): Promise<RefreshToken[]> {
+    return this.refreshTokenRepo.find({
+      where: { userId, isRevoked: false, expiresAt: MoreThan(new Date()) },
+    });
   }
 
-  async revokeAllByUserId(userId: Types.ObjectId): Promise<any> {
-    return await this.refreshTokenModel.updateMany({ userId, isRevoked: false }, { isRevoked: true }).exec();
+  async revokeByTokenHash(
+    tokenHash: string,
+    replacedByTokenHash?: string,
+  ): Promise<void> {
+    await this.refreshTokenRepo.update(
+      { tokenHash },
+      {
+        isRevoked: true,
+        revokedAt: new Date(),
+        ...(replacedByTokenHash ? { replacedByTokenHash } : {}),
+      },
+    );
+  }
+
+  async revokeAllByUserId(userId: string): Promise<void> {
+    await this.refreshTokenRepo.update(
+      { userId, isRevoked: false },
+      { isRevoked: true, revokedAt: new Date() },
+    );
   }
 }

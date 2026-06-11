@@ -13,6 +13,7 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { json, urlencoded } from "express";
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
 import { ConnectivityValidator } from './common/utils/connectivity.validator';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -86,8 +87,7 @@ async function bootstrap() {
   // );
   // app.use(cookieParser());
   // app.use(compression());
-  // await seederService.seedData();
-  // await seederService.seedAdminUser();
+  await seederService.seedAuthData();
   app.setBaseViewsDir(join(__dirname, "..", "..", "src", "views"));
   app.setViewEngine("ejs");
   app.use((req, res, next) => {
@@ -97,12 +97,7 @@ async function bootstrap() {
     json({ limit: "500kb" })(req, res, next);
   });
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-  app.use((req, res, next) => {
-    if (req.originalUrl === "/api/v1/stripe/webhook") {
-      return next();
-    }
-    urlencoded({ extended: true, limit: "500kb" })(req, res, next);
-  });
+ 
 
   app.disable("x-powered-by");
   app.set("trust proxy", 1);
@@ -121,6 +116,16 @@ async function bootstrap() {
       .setVersion(configService.get<string>("npm_package_version"))
       .build();
 
+    // Swagger UI inlines the spec into swagger-ui-init.js. That .js asset is
+    // edge-cached by CDNs (e.g. Cloudflare) by extension, which serves a stale
+    // spec through tunnels/proxies. Mark the spec-bearing routes non-cacheable.
+    app.use((req, res, next) => {
+      if (["/api", "/api-json", "/api-yaml", "/api/swagger-ui-init.js"].includes(req.path)) {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      }
+      next();
+    });
+
     const document = SwaggerModule.createDocument(app, config, { ignoreGlobalPrefix: false });
     SwaggerModule.setup("api", app, document, {
       swaggerOptions: {
@@ -129,7 +134,7 @@ async function bootstrap() {
     });
   }
   try {
-    await ConnectivityValidator.validate(configService);
+    await ConnectivityValidator.validate(configService, app.get(DataSource));
   } catch (error) {
     app.get(WINSTON_MODULE_NEST_PROVIDER).error(`Application failed to start due to connectivity issues: ${error.message}`);
     process.exit(1);
