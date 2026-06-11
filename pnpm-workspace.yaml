@@ -1,4 +1,8 @@
 allowBuilds:
   '@firebase/util': true
+  '@nestjs/core': true
   '@scarf/scarf': true
+  argon2: true
+  msgpackr-extract: true
   protobufjs: true
+  sharp: true

@@ -5,7 +5,7 @@ import { pagination } from '../utils/pagination';
 
 export interface PaginatedResponse<T> {
   data: T[];
-  meta: {
+  pagination: {
     page: number;
     limit: number;
     total: number;
@@ -23,7 +23,7 @@ export class PaginationInterceptor implements NestInterceptor {
           const { data, total, page, limit } = result;
           return {
             data,
-            meta: pagination({ page, limit, total }),
+            pagination: pagination({ page, limit, total }),
           };
         }
         return result;

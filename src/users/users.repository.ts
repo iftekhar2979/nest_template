@@ -1,26 +1,62 @@
 import { Injectable } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User } from './schema/users.schema';
-import { Types } from 'mongoose';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import * as argon2 from 'argon2';
+import { RoleType, User, UserStatus } from './schema/users.schema';
+
 @Injectable()
 export class UserRepository {
-  constructor(@InjectModel(User.name) private readonly userModel: Model<User>) { }
+  constructor(
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
 
-  async create(data: any): Promise<User> {
-    const newUser = new this.userModel(data);
-    return await newUser.save();
+  async create(data: Partial<User>): Promise<User> {
+    const user = this.userRepo.create(data);
+    return this.userRepo.save(user);
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return await this.userModel.findOne({ email }).select('+password').exec();
+    return this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email: email.toLowerCase().trim() })
+      .andWhere('user.isActive = true')
+      .getOne();
   }
 
-  async findById(id: Types.ObjectId): Promise<User | null> {
-    return await this.userModel.findById(id).exec();
+  async findByEmailIncludingInactive(email: string): Promise<User | null> {
+    return this.userRepo
+      .createQueryBuilder('user')
+      .addSelect('user.passwordHash')
+      .where('user.email = :email', { email: email.toLowerCase().trim() })
+      .withDeleted()
+      .getOne();
   }
 
-  async updateById(id: Types.ObjectId, data: any): Promise<User | null> {
-    return await this.userModel.findByIdAndUpdate(id, data, { new: true }).exec();
+  async findById(id: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { id, isActive: true } });
+  }
+
+  async findByIdIncludingInactive(id: string): Promise<User | null> {
+    return this.userRepo.findOne({ where: { id }, withDeleted: true });
+  }
+
+  async updateById(id: string, data: Partial<User>): Promise<User | null> {
+    const update: Partial<User> = { ...data };
+    if (update.passwordHash) {
+      update.passwordHash = await argon2.hash(update.passwordHash);
+    }
+    await this.userRepo.update({ id }, update);
+    return this.findByIdIncludingInactive(id);
+  }
+
+  async updateLastLoginAt(id: string): Promise<void> {
+    await this.userRepo.update({ id }, { lastLoginAt: new Date() });
+  }
+
+  async findRoleUser(role: RoleType): Promise<User | null> {
+    return this.userRepo.findOne({
+      where: { role, status: UserStatus.ACTIVE, isActive: true },
+    });
   }
 }

@@ -1,18 +1,11 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Column, Entity } from 'typeorm';
 import { Base } from '../common/schema/base.schema';
 
-@Schema()
+@Entity('settings')
 export class Settings extends Base {
-  @Prop({
-    required: true,
-    enum: ['privacy_policy', 'terms_and_condition', 'about_us'],
-  })
+  @Column({ type: 'varchar' })
   key: string;
-  @Prop({ required: true })
+
+  @Column({ type: 'text' })
   content: string;
 }
-
-export const SettingsSchema = SchemaFactory.createForClass(Settings);
-
-// Apply production-ready query hooks
-Settings.applyBaseHooks(SettingsSchema);

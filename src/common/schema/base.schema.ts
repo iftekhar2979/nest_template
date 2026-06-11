@@ -1,36 +1,54 @@
-import { Prop, Schema } from '@nestjs/mongoose';
-import mongoose, { Document, Schema as MongooseSchema } from 'mongoose';
-import { ProductionQueryPlugin } from './plugins/production-query.plugin';
+import {
+  Column,
+  CreateDateColumn,
+  DeleteDateColumn,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import type { User } from '../../users/schema/users.schema';
 
-@Schema({
-  timestamps: true,
-  toJSON: { getters: true, virtuals: true },
-  toObject: { getters: true, virtuals: true }
-})
-export abstract class Base extends Document {
-  @Prop({ default: true, index: true })
+/**
+ * Abstract base entity shared by all domain tables.
+ * Provides a UUID primary key, soft-delete (deletedAt) and audit columns.
+ * TypeORM automatically excludes soft-deleted rows from queries unless
+ * `withDeleted: true` is passed.
+ */
+export abstract class Base {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
-  @Prop({ default: 'active', index: true })
+  @Column({ type: 'varchar', default: 'active' })
   status: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true })
-  createdBy: mongoose.Schema.Types.ObjectId;
-
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true })
-  updatedBy: mongoose.Schema.Types.ObjectId;
-
-  @Prop({ default: null, index: true })
-  deletedAt: Date;
-
+  @CreateDateColumn({ type: 'datetime' })
   createdAt: Date;
+
+  @UpdateDateColumn({ type: 'datetime' })
   updatedAt: Date;
 
-  /**
-   * Applies base query hooks to a schema.
-   * Includes soft-delete and active-only filtering as recommended for production.
-   */
-  static applyBaseHooks(schema: MongooseSchema) {
-    schema.plugin(ProductionQueryPlugin);
-  }
+  @DeleteDateColumn({ type: 'datetime', nullable: true })
+  deletedAt: Date | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdBy: string | null;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  updatedBy: string | null;
+
+  // Relations backed by the createdBy/updatedBy FK columns above, so the
+  // creating/updating user can be eagerly joined (relations: ['createdByUser']).
+  // String target + `import type` avoids the circular import with User (which
+  // itself extends Base).
+  @ManyToOne('User', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'createdBy' })
+  createdByUser?: User | null;
+
+  @ManyToOne('User', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'updatedBy' })
+  updatedByUser?: User | null;
 }

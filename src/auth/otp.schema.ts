@@ -1,27 +1,18 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import mongoose from 'mongoose';
+import { Column, Entity, Index } from 'typeorm';
 import { Base } from '../common/schema/base.schema';
 
-@Schema()
+@Entity('otps')
 export class Otp extends Base {
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Profile',
-    default: null,
-    unique: true,
-  })
-  userID: mongoose.Schema.Types.ObjectId;
-  @Prop({ required: true })
+  @Index('idx_otp_user_id', { unique: true })
+  @Column({ type: 'varchar', length: 36, nullable: true, default: null })
+  userID: string;
+
+  @Column({ type: 'varchar', select: false })
   oneTimePassword: string;
-  @Prop({ required: true })
+
+  @Column({ type: 'datetime' })
   expiredAt: Date;
-  @Prop({ default: 0 })
+
+  @Column({ type: 'int', default: 0 })
   attempts: number;
-  
 }
-export const OtpSchema = SchemaFactory.createForClass(Otp);
-
-// Apply production-ready query hooks
-Otp.applyBaseHooks(OtpSchema);
-
-OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 3000 });
